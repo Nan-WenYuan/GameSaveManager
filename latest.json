@@ -1,0 +1,32 @@
+{
+  "tag_name": "v1.11.3",
+  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：01f5f4bbd6a33b104d62701539f17e0cc4d8f88f（完整源码见本版本 source-1.11.3.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "draft": false,
+  "prerelease": false,
+  "assets": [
+    {
+      "id": 602939096,
+      "name": "LICENSE",
+      "size": 34523,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.11.3/LICENSE"
+    },
+    {
+      "id": 602938918,
+      "name": "rgsm.exe",
+      "size": 48407552,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.11.3/rgsm.exe"
+    },
+    {
+      "id": 602939076,
+      "name": "SHA256SUMS",
+      "size": 75,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.11.3/SHA256SUMS"
+    },
+    {
+      "id": 602938838,
+      "name": "source-1.11.3.zip",
+      "size": 7563544,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.11.3/source-1.11.3.zip"
+    }
+  ]
+}
