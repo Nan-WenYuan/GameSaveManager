@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.11.5",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：ecb05acf7c560f756f2d008d46c14ce3bb35b575（完整源码见本版本 source-1.11.5.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "修复本地备份创建、移除后不及时刷新，以及移除时错误提示备份不存在。\n\n默认手动上传与拉取：本地操作不自动上传、发布记录或修改云端。旧配置在本地切换为手动模式。关闭启动、窗口焦点和定时被动云端刷新。\n\n本地备份可在云备份页选择上传；移除本地副本保留已有云端副本和当前游戏存档。\n\n基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：ecb05acf7c560f756f2d008d46c14ce3bb35b575（完整源码见本版本 source-1.11.5.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
