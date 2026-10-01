@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.11.4",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：9e323ffebb73a2dc7155bbf2644543f1441a21f2（完整源码见本版本 source-1.11.4.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "本次修复：\n- 导入游戏关闭后清空旧选择，重新打开从 0 开始，勾选数量不再累积。\n- 本地备份完成后立即显示，不再等待云端刷新或切换游戏。\n\n基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：9e323ffebb73a2dc7155bbf2644543f1441a21f2（完整源码见本版本 source-1.11.4.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
