@@ -3,7 +3,7 @@
 import type { Config } from './generated/types.gen';
 
 export const DEFAULT_CONFIG: Config = {
-  version: '1.12.1',
+  version: '1.12.2',
   backup_path: 'backups',
   games: [],
   settings: {

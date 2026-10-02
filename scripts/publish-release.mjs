@@ -5,10 +5,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseWorkspaceVersion } from "./portable.mjs";
 import { publicUpdateManifest } from "./public-update-manifest.mjs";
+import {
+  advancePublicSource,
+  releaseRepository,
+  validatePublicSourcePaths,
+} from "./public-source.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const sourceRepository = "Nan-WenYuan/GameSaveManager";
-const repository = "Nan-WenYuan/GameSaveManager-Releases";
+const repository = releaseRepository(process.argv.slice(2));
+const sourceRepository = repository;
 const executableName = "rgsm.exe";
 
 function git(args) {
@@ -43,33 +48,47 @@ async function main() {
     throw new Error("请先提交并推送程序源码，再发布与源码一致的更新。");
   }
   const commit = git(["rev-parse", "HEAD"]);
+  const sourceOnly = process.argv.includes("--source-only");
+  const sourceRefIndex = process.argv.indexOf("--source-ref");
+  const sourceCommit =
+    sourceRefIndex >= 0
+      ? git(["rev-parse", `${process.argv[sourceRefIndex + 1]}^{commit}`])
+      : commit;
   const version = parseWorkspaceVersion(
-    await readFile(path.join(root, "Cargo.toml"), "utf8"),
+    git(["show", `${sourceCommit}:Cargo.toml`]),
   );
-  const executable = await readFile(path.join(root, "target/release/rgsm.exe"));
-  if (executable[0] !== 0x4d || executable[1] !== 0x5a)
-    throw new Error("发布文件不是 Windows 程序。");
-  const executableVersion = execFileSync(
-    "powershell",
-    [
-      "-NoProfile",
-      "-Command",
-      "(Get-Item -LiteralPath $env:RGSM_RELEASE_EXE).VersionInfo.ProductVersion",
-    ],
-    {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        RGSM_RELEASE_EXE: path.join(root, "target/release/rgsm.exe"),
+  const executable = sourceOnly
+    ? null
+    : await readFile(path.join(root, "target/release/rgsm.exe"));
+  if (!sourceOnly) {
+    if (executable[0] !== 0x4d || executable[1] !== 0x5a)
+      throw new Error("发布文件不是 Windows 程序。");
+    const executableVersion = execFileSync(
+      "powershell",
+      [
+        "-NoProfile",
+        "-Command",
+        "(Get-Item -LiteralPath $env:RGSM_RELEASE_EXE).VersionInfo.ProductVersion",
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          RGSM_RELEASE_EXE: path.join(root, "target/release/rgsm.exe"),
+        },
+        stdio: ["pipe", "pipe", "pipe"],
       },
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  ).trim();
-  if (executableVersion !== version)
-    throw new Error("程序文件版本与源码版本不一致。");
+    ).trim();
+    if (executableVersion !== version)
+      throw new Error("程序文件版本与源码版本不一致。");
+    if (sourceCommit !== commit)
+      throw new Error("正式发布必须使用当前源码提交。");
+  }
   if (git(["rev-parse", "origin/personal-dev"]) !== commit)
     throw new Error("当前源码尚未同步到 origin/personal-dev。");
-  const checksum = createHash("sha256").update(executable).digest("hex");
+  const checksum = sourceOnly
+    ? null
+    : createHash("sha256").update(executable).digest("hex");
   const token = githubToken();
   async function request(url, options = {}, allowNotFound = false) {
     const parsed = new URL(url);
@@ -99,9 +118,9 @@ async function main() {
   const base = `https://api.github.com/repos/${repository}`;
   const repositoryInfo = await request(base);
   if (repositoryInfo.private) throw new Error("程序发布仓库必须为公有仓库。");
-  await request(`${sourceBase}/commits/${commit}`);
+  await request(`${sourceBase}/commits/${sourceCommit}`);
   const remote = await request(
-    `${sourceBase}/contents/Cargo.toml?ref=${commit}`,
+    `${sourceBase}/contents/Cargo.toml?ref=${sourceCommit}`,
   );
   const remoteVersion = parseWorkspaceVersion(
     Buffer.from(remote.content, "base64").toString("utf8"),
@@ -109,6 +128,33 @@ async function main() {
   if (remoteVersion !== version)
     throw new Error("远程源码版本与本地程序版本不一致。");
   const tag = `v${version}`;
+  if (sourceOnly) {
+    const existing = await request(`${base}/releases/tags/${tag}`);
+    if (existing.draft || existing.prerelease)
+      throw new Error("仅可补充正式已发布版本的源码。");
+    const publicCommit = await advancePublicSource({
+      root,
+      sourceCommit,
+      publicRemote: `https://github.com/${repository}.git`,
+      version,
+    });
+    await request(`${base}/git/refs/tags/${tag}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sha: publicCommit, force: true }),
+    });
+    await request(`${base}/releases/${existing.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        body: `${existing.body}\n\n在线对应源码：https://github.com/${repository}/tree/${tag}`,
+      }),
+    });
+    console.log(
+      `已同步 ${version} 源码：https://github.com/${repository}/tree/${publicCommit}`,
+    );
+    return;
+  }
   if (await request(`${base}/releases/tags/${tag}`, {}, true)) {
     throw new Error("该版本已有 Release，请增加版本号；不会覆盖已有更新。");
   }
@@ -116,15 +162,7 @@ async function main() {
   const trackedPaths = git(["ls-tree", "-r", "--name-only", commit]).split(
     "\n",
   );
-  if (
-    trackedPaths.some(
-      (file) =>
-        /^(data|save_data|backups|cloud|交付)\//.test(file) ||
-        /(^|\/)\.env($|\.(?!example$))/.test(file),
-    )
-  ) {
-    throw new Error("源码包含运行数据或环境密钥文件，停止公有发布。");
-  }
+  validatePublicSourcePaths(trackedPaths);
   const sourceArchive = execFileSync(
     "git",
     ["archive", "--format=zip", `--prefix=GameSaveManager-${version}/`, commit],
@@ -134,14 +172,20 @@ async function main() {
       stdio: ["pipe", "pipe", "pipe"],
     },
   );
+  const publicCommit = await advancePublicSource({
+    root,
+    sourceCommit,
+    publicRemote: `https://github.com/${repository}.git`,
+    version,
+  });
   const release = await request(`${base}/releases`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       tag_name: tag,
-      target_commitish: repositoryInfo.default_branch,
+      target_commitish: publicCommit,
       name: `游戏存档管理器 ${version}`,
-      body: `基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：${commit}（完整源码见本版本 source-${version}.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。`,
+      body: `基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：${commit}。在线源码：https://github.com/${repository}/tree/${tag}；完整源码见本版本 source-${version}.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。`,
       draft: true,
       prerelease: false,
     }),
@@ -184,49 +228,6 @@ async function main() {
     )
       throw new Error("GitHub 改写了更新文件名，版本将保留为草稿。 ");
   }
-  if (process.argv.includes("--bridge-private")) {
-    const bridge = await request(
-      `${sourceBase}/releases/tags/${tag}`,
-      {},
-      true,
-    );
-    if (bridge) throw new Error("私有仓库已有该版本，停止创建桥接版本。");
-    const privateRelease = await request(`${sourceBase}/releases`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tag_name: tag,
-        target_commitish: commit,
-        name: `游戏存档管理器 ${version}`,
-        body: `本版本切换到公有更新仓库。后续更新无需 Token。公开版本与完整源码：https://github.com/${repository}/releases/tag/${tag}`,
-        draft: true,
-        prerelease: false,
-      }),
-    });
-    const bridgeUpload = privateRelease.upload_url.replace(/\{.*$/, "");
-    for (const asset of [
-      { name: executableName, body: executable },
-      { name: "SHA256SUMS", body: `${checksum}  ${executableName}\n` },
-      { name: "LICENSE", body: await readFile(path.join(root, "LICENSE")) },
-      { name: `source-${version}.zip`, body: sourceArchive },
-    ]) {
-      const uploaded = await request(
-        `${bridgeUpload}?name=${encodeURIComponent(asset.name)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/octet-stream" },
-          body: asset.body,
-        },
-      );
-      if (
-        uploaded.size !== Buffer.byteLength(asset.body) ||
-        uploaded.state !== "uploaded"
-      )
-        throw new Error("桥接附件未完整上传，保留草稿。");
-    }
-    // Publish the public version first; old clients only discover the bridge afterwards.
-    release.bridgeId = privateRelease.id;
-  }
   const published = await request(`${base}/releases/${release.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -252,12 +253,6 @@ async function main() {
       ...(previousManifest ? { sha: previousManifest.sha } : {}),
     }),
   });
-  if (release.bridgeId)
-    await request(`${sourceBase}/releases/${release.bridgeId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draft: false }),
-    });
   console.log(`已发布：${published.html_url}`);
 }
 

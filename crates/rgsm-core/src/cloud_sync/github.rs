@@ -29,6 +29,18 @@ impl fmt::Debug for GithubStorage {
     }
 }
 
+// Existing personal settings must never send save credentials to the public source repository.
+fn save_repository<'a>(owner: &str, repository: &'a str, branch: &str) -> &'a str {
+    if owner.eq_ignore_ascii_case("Nan-WenYuan")
+        && repository.eq_ignore_ascii_case("GameSaveManager")
+        && branch == "saves"
+    {
+        "Game_Data"
+    } else {
+        repository
+    }
+}
+
 pub(super) fn operator(
     owner: &str,
     repository: &str,
@@ -53,6 +65,7 @@ pub(super) fn operator(
     }
     let root = root.trim_matches('/');
     validate_path(root)?;
+    let repository = save_repository(owner, repository, branch);
     let endpoint = Url::parse(&format!(
         "https://api.github.com/repos/{owner}/{repository}/"
     ))
@@ -409,6 +422,26 @@ impl Access for GithubStorage {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn migration_routes_only_existing_owner_saves_to_private_data() {
+        assert_eq!(
+            super::save_repository("Nan-WenYuan", "GameSaveManager", "saves"),
+            "Game_Data"
+        );
+        assert_eq!(
+            super::save_repository("other", "GameSaveManager", "saves"),
+            "GameSaveManager"
+        );
+        assert_eq!(
+            super::save_repository("Nan-WenYuan", "GameSaveManager", "main"),
+            "GameSaveManager"
+        );
+        assert_eq!(
+            super::save_repository("Nan-WenYuan", "custom", "saves"),
+            "custom"
+        );
+    }
+
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 

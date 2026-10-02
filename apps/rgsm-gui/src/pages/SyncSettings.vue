@@ -146,7 +146,7 @@ const s3_settings: Ref<S3> = ref({
 const github_settings = ref<GitHub>({
   type: 'GitHub',
   owner: 'Nan-WenYuan',
-  repository: 'GameSaveManager',
+  repository: 'Game_Data',
   branch: 'saves',
   token: '',
 });

@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
-const REPOSITORY: &str = "Nan-WenYuan/GameSaveManager-Releases";
+const REPOSITORY: &str = "Nan-WenYuan/GameSaveManager";
+const TRANSITION_REPOSITORY: &str = "Nan-WenYuan/GameSaveManager-Releases";
 const EXECUTABLE: &str = "游戏存档管理器.exe";
 // GitHub normalizes non-ASCII upload names. Keep release assets ASCII while
 // retaining the stable localized executable filename inside the portable package.
@@ -98,6 +99,28 @@ async fn latest(client: &reqwest::Client) -> Result<Release> {
             .await?;
     }
     if response.status() == reqwest::StatusCode::NOT_FOUND {
+        // Migration can be published before the final repository rename. Only
+        // this fixed public transition endpoint is allowed; never use save config.
+        response = client
+            .get(format!(
+                "https://api.github.com/repos/{TRANSITION_REPOSITORY}/releases/latest"
+            ))
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .send()
+            .await?;
+        if matches!(
+            response.status(),
+            reqwest::StatusCode::FORBIDDEN | reqwest::StatusCode::TOO_MANY_REQUESTS
+        ) {
+            response = client
+                .get(format!(
+                    "https://raw.githubusercontent.com/{TRANSITION_REPOSITORY}/main/latest.json"
+                ))
+                .send()
+                .await?;
+        }
+    }
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
         bail!(rust_i18n::t!("program_update.errors.no_release").to_string());
     }
     let release: Release = response.error_for_status()?.json().await?;
@@ -146,9 +169,12 @@ fn validate_asset_url(value: &str) -> Result<()> {
             && url.port_or_known_default() == Some(443)
             && url.username().is_empty()
             && url.password().is_none()
-            && url
-                .path()
-                .starts_with(&format!("/{REPOSITORY}/releases/download/")),
+            && [REPOSITORY, TRANSITION_REPOSITORY]
+                .iter()
+                .any(|repository| {
+                    url.path()
+                        .starts_with(&format!("/{repository}/releases/download/"))
+                }),
         rust_i18n::t!("program_update.errors.redirect_invalid").to_string()
     );
     Ok(())
@@ -466,6 +492,47 @@ pub fn clean_completed_update() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn public_update_requests_never_include_save_authorization() {
+        let request = client()
+            .unwrap()
+            .get(format!(
+                "https://api.github.com/repos/{REPOSITORY}/releases/latest"
+            ))
+            .build()
+            .unwrap();
+        assert!(
+            !request
+                .headers()
+                .contains_key(reqwest::header::AUTHORIZATION)
+        );
+    }
+
+    #[test]
+    fn migration_accepts_only_new_and_transition_public_assets() {
+        assert_eq!(REPOSITORY, "Nan-WenYuan/GameSaveManager");
+        for repository in ["GameSaveManager", "GameSaveManager-Releases"] {
+            assert!(
+                validate_asset_url(&format!(
+                    "https://github.com/Nan-WenYuan/{repository}/releases/download/v1.12.2/rgsm.exe"
+                ))
+                .is_ok()
+            );
+        }
+        assert!(
+            validate_asset_url(
+                "https://github.com/Nan-WenYuan/Game_Data/releases/download/v1/rgsm.exe"
+            )
+            .is_err()
+        );
+        assert!(
+            validate_asset_url(
+                "https://github.com/Nan-WenYuan/GameSaveManager-Other/releases/download/v1/rgsm.exe"
+            )
+            .is_err()
+        );
+    }
 
     /// Opt-in acceptance against the public release without credentials.
     #[tokio::test]
