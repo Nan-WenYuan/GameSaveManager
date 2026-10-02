@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.12.0",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：426a52b559d01889d84a1a61a7cd06e8065f29ef（完整源码见本版本 source-1.12.0.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "新增游戏管理配置的手动上传和拉取。\n\n- 云备份页新增“上传配置”和“拉取配置”，覆盖前确认。\n- 仅上传游戏列表、存档位置和备份设置；凭据、本地备份目录和界面设置留在本地。\n- 拉取先校验并备份本地配置，保留已有游戏的本机存档路径，不修改实际游戏存档。\n- 所有配置云端操作均由用户手动触发。\n\n基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：426a52b559d01889d84a1a61a7cd06e8065f29ef（完整源码见本版本 source-1.12.0.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
