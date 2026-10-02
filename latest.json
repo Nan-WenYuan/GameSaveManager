@@ -1,32 +1,32 @@
 {
-  "tag_name": "v1.12.2",
-  "body": "仓库分工已调整：\n- GameSaveManager：公开程序源码与发行版本。\n- Game_Data：私有游戏存档与游戏管理配置。\n\n旧存档连接自动转向 Game_Data。程序更新无需令牌，保留本地配置与备份。\n\n基于 mcthesw/game-save-manager，遵循 AGPL-3.0-only。\n对应源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.12.2",
+  "tag_name": "v1.12.3",
+  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：49efb7fe39dfeab271be2640c2a92e8036ce509c。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.12.3；完整源码见本版本 source-1.12.3.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
     {
-      "id": 605727087,
+      "id": 606130551,
       "name": "LICENSE",
       "size": 34523,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/LICENSE"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/LICENSE"
     },
     {
-      "id": 605726154,
+      "id": 606130223,
       "name": "rgsm.exe",
-      "size": 48723456,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/rgsm.exe"
+      "size": 48721408,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/rgsm.exe"
     },
     {
-      "id": 605727055,
+      "id": 606130525,
       "name": "SHA256SUMS",
       "size": 75,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/SHA256SUMS"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/SHA256SUMS"
     },
     {
-      "id": 605725657,
-      "name": "source-1.12.2.zip",
-      "size": 7584912,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/source-1.12.2.zip"
+      "id": 606130148,
+      "name": "source-1.12.3.zip",
+      "size": 7589280,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/source-1.12.3.zip"
     }
   ]
 }
