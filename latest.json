@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.12.1",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：f647ac587797d4861a6261a488448fe81e39d806（完整源码见本版本 source-1.12.1.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "改进手动云端传输的进度反馈。\n\n- 上传和拉取存档、配置时显示动态进度窗口。\n- 批量传输显示当前游戏与实际已完成的备份数量。\n- 云端检查和列表刷新阶段同样有等待反馈；成功或失败后自动关闭进度窗口。\n- 保持手动覆盖与本地优先，不自动上传用户数据。\n\n基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：f647ac587797d4861a6261a488448fe81e39d806（完整源码见本版本 source-1.12.1.zip 附件）\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
