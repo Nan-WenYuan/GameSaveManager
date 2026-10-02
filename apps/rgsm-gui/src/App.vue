@@ -15,7 +15,6 @@ import {
   routeStageUpdate,
 } from './composables/useActivityCenter';
 import { useConfig } from './composables/useConfig';
-import { connectSavedCloudLibrary } from './composables/useCloudConnection';
 import { useCloudLibraryRefresh } from './composables/useCloudLibrary';
 import { useGlobalLoading } from './composables/useGlobalLoading';
 import { useHostNotificationCollector } from './composables/useHostNotificationCollector';
@@ -96,14 +95,6 @@ async function initializeApp() {
     const destination = resolveStartupDestination(route.fullPath, mappedHome, config.value.games);
     if (destination !== route.fullPath) {
       await navigateTo(destination);
-    }
-
-    if ((config.value.settings.cloud_settings?.backend?.type ?? 'Disabled') !== 'Disabled') {
-      void connectSavedCloudLibrary()
-        .then((result) => {
-          if (result.status === 'error') logError(`Cloud connection failed: ${result.error}`);
-        })
-        .catch((cause) => logError(`Cloud connection failed: ${cause}`));
     }
   } catch (cause) {
     logError(`Failed to initialize app: ${cause}`);
