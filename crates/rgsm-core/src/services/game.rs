@@ -24,7 +24,7 @@ impl ServiceContext {
             bail!("Game '{}' already exists", game.name);
         }
         let previous_config = config;
-        let v2_change = capture_v2_game_change()?;
+        let v2_change = capture_v2_game_change(&source)?;
 
         let saved_game = backup::create_game_backup(game).await?;
         if let Some(expected) = v2_change
@@ -61,7 +61,7 @@ impl ServiceContext {
     ) -> Result<()> {
         let mut config = get_config()?;
         let previous_config = config.clone();
-        let v2_change = capture_v2_game_change()?;
+        let v2_change = capture_v2_game_change(&source)?;
         let index = config
             .games
             .iter()
@@ -319,7 +319,12 @@ struct ExpectedV2GameChange {
     local_state: LocalState,
 }
 
-fn capture_v2_game_change() -> Result<Option<ExpectedV2GameChange>> {
+fn capture_v2_game_change(source: &HookSource) -> Result<Option<ExpectedV2GameChange>> {
+    // Editing the personal library is local. Cloud publication is an explicit
+    // upload action, never a prerequisite for saving a name or launch path.
+    if *source == HookSource::UserManual {
+        return Ok(None);
+    }
     let (library, profile, local_state) = cloud_bootstrap_inputs()?;
     Ok(
         (local_state.cloud_namespace_generation == CloudNamespaceGeneration::V2).then_some(
@@ -443,4 +448,18 @@ fn validate_game_automation_config(automation: Option<&GameAutomationSettingsDra
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod manual_game_change_tests {
+    use super::*;
+
+    #[test]
+    fn manual_game_changes_never_prepare_automatic_cloud_publication() {
+        assert!(
+            capture_v2_game_change(&HookSource::UserManual)
+                .unwrap()
+                .is_none()
+        );
+    }
 }

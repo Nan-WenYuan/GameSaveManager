@@ -70,6 +70,7 @@ const viewMode = ref<'table' | 'branch'>('table');
 
 const search = ref(''); // 搜索时使用的字符串
 const drawer = ref(false); // 是否显示存档位置侧栏
+const savingGame = ref(false);
 const extraBackupDrawer = ref(false);
 const autoSaveSettingsDrawer = ref(false); // 是否显示自动保存设置抽屉
 
@@ -893,6 +894,8 @@ async function set_quick_backup() {
 
 // 处理抽屉组件保存游戏路径的事件
 async function on_drawer_save_changes(updatedGame: Game) {
+  if (savingGame.value) return;
+  savingGame.value = true;
   try {
     const result = await commands.updateGame(game.value.storage_key ?? game.value.name, {
       name: updatedGame.name,
@@ -927,6 +930,8 @@ async function on_drawer_save_changes(updatedGame: Game) {
   } catch (e) {
     error(`Error saving game paths: ${e}`);
     notifyError($t('error.save_config_failed'));
+  } finally {
+    savingGame.value = false;
   }
 }
 
@@ -1325,6 +1330,7 @@ const viewModeOptions = computed(() => [
       v-if="game"
       v-model="drawer"
       :game="game"
+      :saving="savingGame"
       @closed="drawer = false"
       @save-changes="on_drawer_save_changes"
     />

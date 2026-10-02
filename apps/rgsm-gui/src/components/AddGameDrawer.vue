@@ -25,6 +25,7 @@ import { createGameFavorite, collectFavoriteGameIds } from './favoriteTreeContex
 import { hasGameNameConflict } from '../utils/gameName';
 import { resolveGameReference } from '../utils/appRoutes';
 import { singleFlight } from '../utils/singleFlight';
+import { isEqual } from 'lodash-unified';
 
 const feedback = useFeedback();
 const { warnUnavailableLocations } = useSaveLocationCheck();
@@ -785,7 +786,7 @@ async function saveGame() {
     return;
   }
 
-  if (currentDevice.value) {
+  if (currentDevice.value && !isEqual(save_paths, editingGame.value?.save_paths)) {
     await warnUnavailableLocations(save_paths, currentDevice.value.id);
   }
 
@@ -811,9 +812,11 @@ async function saveGame() {
     };
   }
 
-  if (game_path.value && currentDevice.value) {
-    game.game_paths = {};
-    game.game_paths[currentDevice.value.id] = game_path.value;
+  if (currentDevice.value) {
+    game.game_paths = {
+      ...(editingGame.value?.game_paths ?? {}),
+      [currentDevice.value.id]: game_path.value.trim(),
+    };
   }
   try {
     if (is_editing.value) {

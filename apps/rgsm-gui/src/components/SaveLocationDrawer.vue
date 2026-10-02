@@ -18,6 +18,7 @@ import PathVariableInput from './PathVariableInput.vue';
 import ResourceMultiSelect from './ResourceMultiSelect.vue';
 import { saveUnitPaths, saveUnitType } from '../utils/saveUnit';
 import { hasGameNameConflict } from '../utils/gameName';
+import { isEqual } from 'lodash-unified';
 import { KAlert, KButton, KDrawer, KInput, KSwitch, KTag, KTooltip } from '../ui/kit';
 
 const { config } = useConfig();
@@ -28,6 +29,7 @@ const { resourceLabel } = usePathResolution();
 const props = defineProps<{
   game: Game;
   modelValue: boolean;
+  saving?: boolean;
 }>();
 
 const emits = defineEmits<{
@@ -55,6 +57,8 @@ const tempGame = ref<Game>({
   device_bindings: {},
 });
 const hasUnsavedChanges = ref(false);
+const checkingSave = ref(false);
+const busy = computed(() => checkingSave.value || props.saving);
 
 const selectedDeviceResources = computed(() => currentDevice.value?.resources ?? []);
 const rootResources = computed(() =>
@@ -220,6 +224,16 @@ function switchDeleteBeforeApply(_unit: SaveUnit) {
 }
 
 async function saveChanges() {
+  if (busy.value) return;
+  checkingSave.value = true;
+  try {
+    await submitChanges();
+  } finally {
+    checkingSave.value = false;
+  }
+}
+
+async function submitChanges() {
   const trimmedName = tempGame.value.name.trim();
   if (!trimmedName) {
     notifyError($t('addgame.no_name_error'));
@@ -232,11 +246,10 @@ async function saveChanges() {
   }
 
   tempGame.value.name = trimmedName;
-  if (currentDevice.value) {
+  if (currentDevice.value && !isEqual(tempGame.value.save_paths, props.game.save_paths)) {
     await warnUnavailableLocations(tempGame.value.save_paths, currentDevice.value.id);
   }
   emits('saveChanges', JSON.parse(JSON.stringify(tempGame.value)));
-  hasUnsavedChanges.value = false;
 }
 
 function cancelChanges() {
@@ -695,10 +708,15 @@ async function handleOpenPath(e: MouseEvent, path: string, unit?: SaveUnit) {
     </div>
 
     <template #footer>
-      <KButton :disabled="!hasUnsavedChanges" @click="cancelChanges">
+      <KButton :disabled="!hasUnsavedChanges || busy" @click="cancelChanges">
         {{ $t('common.cancel') }}
       </KButton>
-      <KButton variant="primary" :disabled="!hasUnsavedChanges" @click="saveChanges">
+      <KButton
+        variant="primary"
+        :disabled="!hasUnsavedChanges"
+        :loading="busy"
+        @click="saveChanges"
+      >
         {{ $t('common.save') }}
       </KButton>
     </template>
