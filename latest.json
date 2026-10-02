@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.12.2",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：115bd64e12c6e91324deb4ccb18d39f796388868。在线源码：https://github.com/Nan-WenYuan/GameSaveManager-Releases/tree/v1.12.2；完整源码见本版本 source-1.12.2.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "仓库分工已调整：\n- GameSaveManager：公开程序源码与发行版本。\n- Game_Data：私有游戏存档与游戏管理配置。\n\n旧存档连接自动转向 Game_Data。程序更新无需令牌，保留本地配置与备份。\n\n基于 mcthesw/game-save-manager，遵循 AGPL-3.0-only。\n对应源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.12.2",
   "draft": false,
   "prerelease": false,
   "assets": [
@@ -8,25 +8,25 @@
       "id": 605727087,
       "name": "LICENSE",
       "size": 34523,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.12.2/LICENSE"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/LICENSE"
     },
     {
       "id": 605726154,
       "name": "rgsm.exe",
       "size": 48723456,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.12.2/rgsm.exe"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/rgsm.exe"
     },
     {
       "id": 605727055,
       "name": "SHA256SUMS",
       "size": 75,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.12.2/SHA256SUMS"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/SHA256SUMS"
     },
     {
       "id": 605725657,
       "name": "source-1.12.2.zip",
       "size": 7584912,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager-Releases/releases/download/v1.12.2/source-1.12.2.zip"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.2/source-1.12.2.zip"
     }
   ]
 }
