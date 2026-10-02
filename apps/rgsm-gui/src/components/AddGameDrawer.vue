@@ -24,6 +24,7 @@ import { useSaveLocationCheck } from '../composables/useSaveLocationCheck';
 import { createGameFavorite, collectFavoriteGameIds } from './favoriteTreeContext';
 import { hasGameNameConflict } from '../utils/gameName';
 import { resolveGameReference } from '../utils/appRoutes';
+import { singleFlight } from '../utils/singleFlight';
 
 const feedback = useFeedback();
 const { warnUnavailableLocations } = useSaveLocationCheck();
@@ -35,6 +36,7 @@ const save_paths = reactive<SaveUnitDraft[]>([]); // 选择游戏存档目录
 const game_path = ref(''); // 选择游戏启动程序
 const game_icon_src = ref('/orange.png');
 const is_editing = ref(false); // 是否正在编辑已有的游戏
+const isSaving = ref(false);
 const editing_storage_key = ref(''); // storage_key of the game being edited
 const currentDevice = ref<Device | null>(null); // 当前设备信息
 
@@ -468,7 +470,15 @@ async function showCustomizationDialog(game: ImportableGame) {
   }
 }
 
-async function handleCustomizeConfirm(data: {
+function handleCustomizeConfirm(data: {
+  gameName: string;
+  savePaths: SavePath[];
+  storeUserId: string | null;
+}) {
+  return submitGame(() => importCustomizedGame(data));
+}
+
+async function importCustomizedGame(data: {
   gameName: string;
   savePaths: SavePath[];
   storeUserId: string | null;
@@ -555,7 +565,7 @@ async function handleCustomizeConfirm(data: {
     }
 
     pendingStoreUserId.value = data.storeUserId;
-    await save();
+    await saveGame();
   } catch (e) {
     error(`Error importing game: ${e}`);
     notifyError($t('game_import.import_error'));
@@ -740,7 +750,20 @@ async function saveImportedFavorites(games: Game[]): Promise<boolean> {
   return saveConfig();
 }
 
-async function save() {
+const submitGame = singleFlight(async (operation: () => Promise<void>) => {
+  isSaving.value = true;
+  try {
+    await operation();
+  } finally {
+    isSaving.value = false;
+  }
+});
+
+function save() {
+  return submitGame(saveGame);
+}
+
+async function saveGame() {
   const accountResourceId = await ensureSteamAccountResource(pendingStoreUserId.value);
   const normalizedInstallDirs = manualInstallDirs.value
     .map((dir) => dir.trim())
@@ -963,12 +986,12 @@ function deleteRow(index: number) {
     </div>
 
     <template #footer>
-      <KButton size="sm" variant="ghost" @click="reset_info()">
+      <KButton size="sm" variant="ghost" :disabled="isSaving" @click="reset_info()">
         <RotateCcw :size="13" aria-hidden="true" />
         {{ $t('addgame.reset_current_profile') }}
       </KButton>
       <div class="flex-1" />
-      <KButton variant="primary" @click="save()">
+      <KButton variant="primary" :loading="isSaving" @click="save()">
         <Check :size="14" aria-hidden="true" />
         {{ $t('common.save') }}
       </KButton>
