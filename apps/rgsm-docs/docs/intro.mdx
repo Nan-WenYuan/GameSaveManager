@@ -1,0 +1,39 @@
+---
+sidebar_position: 1
+description: 下载游戏存档管理器，添加游戏并创建第一个存档点。
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+# 快速入门
+
+游戏存档管理器支持备份、恢复和云同步。本指南适用于 **1.9 系列**。
+
+## 下载
+
+- [正式版](https://github.com/mcthesw/game-save-manager/releases/latest)：推荐日常使用，目前为 1.8。
+- [测试版](https://github.com/mcthesw/game-save-manager/releases/tag/latest)：提前体验正在开发的功能。
+
+Windows 用户可选择安装版，或解压便携版后运行。便携版需要 [WebView2 运行时](https://developer.microsoft.com/microsoft-edge/webview2/)。
+
+从旧版升级前，先阅读[升级到 1.9](./help/upgrade.mdx)。
+
+## 添加游戏
+
+点击左侧的 **添加游戏**，填写游戏名称并选择存档位置，或使用 **自动识别本地游戏**。游戏启动文件选填。
+
+<Screenshot src="/img/guide/add-game.png" alt="添加游戏抽屉中的名称、启动位置与存档位置" caption="支持添加多个存档文件或文件夹" />
+
+## 保存一个进度点
+
+从左侧选择游戏，填写描述，点击 **创建新快照**。
+
+<Screenshot src="/img/guide/snapshots.png" alt="星露谷物语的存档列表及当前进度高亮" caption="当前存档点在列表中高亮" />
+
+## 恢复旧存档
+
+退出游戏后，点击存档右侧的 **应用**，或顶部的 **应用最新快照**。
+
+恢复前默认保留一份 **额外备份**，可用来找回覆盖前的存档。
+
+接下来可以设置[自动备份](./backups/automatic.mdx)、[快捷操作](./backups/shortcuts.md)，或连接[云同步](./extras/cloud.mdx)。

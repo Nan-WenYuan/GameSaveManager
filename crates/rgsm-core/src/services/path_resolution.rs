@@ -1,0 +1,614 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+
+use crate::backup::{
+    CapturePlan, Game, SaveUnit, SaveUnitCaptureInput, SaveUnitSource, SaveUnitType,
+};
+use crate::config::Config;
+use crate::device::{DeviceResourceKind, get_current_device_id};
+use crate::path_pattern::{PathPatternError, PlatformKind, parse_manifest_path_pattern};
+use crate::path_resolution::{
+    CandidateDimensions, CandidateExpression, GameInstallationCandidate, GameRootCandidate,
+    PlatformPaths, ResolutionContext, ResolutionDiagnostic, ResolutionDiagnosticKind,
+    ResolutionReport, ResolutionSelection, ResolutionSelectionState, ResolvedLocationKind,
+    ResolvedSaveLocation, StoreAccountCandidate, match_resolution_plan, plan_resolution,
+};
+
+use super::ServiceContext;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResolutionPurpose {
+    Capture,
+    Restore,
+}
+
+impl ServiceContext {
+    pub fn check_ad_hoc_paths(
+        &self,
+        config: &Config,
+        paths: &[String],
+        store_user_id: Option<&str>,
+        install_dirs: &[String],
+        steam_id: Option<u32>,
+    ) -> Vec<crate::path_resolver::PathCheckResult> {
+        paths
+            .iter()
+            .map(|path| {
+                if crate::backup::registry::is_registry_path(path) {
+                    return crate::path_resolver::check_path(path, None, config);
+                }
+                let report = self.resolve_ad_hoc_pattern(
+                    config,
+                    path,
+                    store_user_id,
+                    install_dirs,
+                    steam_id,
+                );
+                if matches!(
+                    report.selection_state,
+                    ResolutionSelectionState::Missing
+                        | ResolutionSelectionState::Ambiguous { .. }
+                        | ResolutionSelectionState::StaleSelection { .. }
+                ) {
+                    return crate::path_resolver::PathCheckResult::ResolveFailed {
+                        raw_path: path.clone(),
+                        error: report
+                            .diagnostics
+                            .iter()
+                            .map(|diagnostic| diagnostic.message.as_str())
+                            .collect::<Vec<_>>()
+                            .join("; "),
+                    };
+                }
+                if let Some(location) = report.locations.first() {
+                    return crate::path_resolver::PathCheckResult::Ok {
+                        raw_path: path.clone(),
+                        resolved_path: location.path.clone(),
+                        is_file: matches!(location.kind, ResolvedLocationKind::File),
+                    };
+                }
+                crate::path_resolver::PathCheckResult::NotFound {
+                    raw_path: path.clone(),
+                    resolved_path: report
+                        .candidates
+                        .first()
+                        .map(|candidate| candidate.expression.clone())
+                        .unwrap_or_else(|| path.clone()),
+                }
+            })
+            .collect()
+    }
+
+    pub fn resolve_ad_hoc_pattern(
+        &self,
+        config: &Config,
+        pattern: &str,
+        store_user_id: Option<&str>,
+        install_dirs: &[String],
+        steam_id: Option<u32>,
+    ) -> ResolutionReport {
+        let game = Game {
+            name: "Path preview".to_string(),
+            storage_key: String::new(),
+            save_paths: Vec::new(),
+            game_paths: Default::default(),
+            next_save_unit_id: 0,
+            cloud_sync_enabled: false,
+            auto_backup: None,
+            ludusavi_meta: Some(crate::backup::LudusaviMeta {
+                install_dirs: install_dirs.to_vec(),
+                store_game_ids: steam_id
+                    .map(|id| crate::backup::StoreGameId {
+                        store: crate::path_pattern::StoreKind::Steam,
+                        id: id.to_string(),
+                    })
+                    .into_iter()
+                    .collect(),
+            }),
+            device_bindings: Default::default(),
+        };
+        let mut context = resolution_context(config, &game, get_current_device_id());
+        if let Some(user_id) = store_user_id {
+            let id = detected_id("preview-account", user_id);
+            context.accounts = vec![StoreAccountCandidate {
+                id: id.clone(),
+                store: crate::path_pattern::StoreKind::Steam,
+                user_id: user_id.to_string(),
+            }];
+            context.selection.account_ids = Some([id].into_iter().collect());
+        }
+        let parsed = match parse_manifest_path_pattern(pattern) {
+            Ok(parsed) => parsed,
+            Err(error) => return invalid_pattern_report(pattern, error),
+        };
+        let plan = plan_resolution(
+            &parsed,
+            crate::path_pattern::ManifestPathConstraints::default(),
+            &context,
+        );
+        match match_resolution_plan(&plan) {
+            Ok(report) => report,
+            Err(error) => ResolutionReport {
+                raw_pattern: pattern.to_string(),
+                selection_state: plan.selection_state,
+                candidates: plan.candidates,
+                locations: Vec::new(),
+                diagnostics: vec![ResolutionDiagnostic {
+                    kind: ResolutionDiagnosticKind::InvalidGlob,
+                    message: error.to_string(),
+                }],
+            },
+        }
+    }
+
+    pub(crate) fn capture_plan(
+        &self,
+        config: &Config,
+        game: &Game,
+    ) -> Result<CapturePlan, crate::backup::CapturePlanError> {
+        CapturePlan::from_resolution_reports(
+            game.save_paths
+                .iter()
+                .filter(|save_unit| save_unit.enabled)
+                .map(|save_unit| SaveUnitCaptureInput {
+                    save_unit_id: save_unit.id,
+                    delete_before_apply: save_unit.delete_before_apply,
+                    report: self.resolve_save_unit(config, game, save_unit),
+                })
+                .collect(),
+        )
+    }
+
+    /// Resolve a Save Unit against an explicitly supplied configuration snapshot.
+    /// This is the composition boundary for host paths and per-device resources.
+    pub fn resolve_save_unit(
+        &self,
+        config: &Config,
+        game: &Game,
+        save_unit: &SaveUnit,
+    ) -> ResolutionReport {
+        self.resolve_save_unit_for(config, game, save_unit, ResolutionPurpose::Capture)
+    }
+
+    pub(crate) fn resolve_save_unit_for_restore(
+        &self,
+        config: &Config,
+        game: &Game,
+        save_unit: &SaveUnit,
+    ) -> ResolutionReport {
+        self.resolve_save_unit_for(config, game, save_unit, ResolutionPurpose::Restore)
+    }
+
+    fn resolve_save_unit_for(
+        &self,
+        config: &Config,
+        game: &Game,
+        save_unit: &SaveUnit,
+        purpose: ResolutionPurpose,
+    ) -> ResolutionReport {
+        let device_id = get_current_device_id();
+        match &save_unit.source {
+            SaveUnitSource::Concrete { unit_type, paths } => {
+                let path_context = game.path_context(config.devices.get(device_id));
+                resolve_concrete(
+                    paths.get(device_id),
+                    unit_type,
+                    Some(&path_context),
+                    purpose,
+                )
+            }
+            SaveUnitSource::ManifestPattern {
+                pattern,
+                constraints,
+                ..
+            } => {
+                let context = resolution_context(config, game, device_id);
+                let parsed = match parse_manifest_path_pattern(pattern.raw()) {
+                    Ok(parsed) => parsed,
+                    Err(error) => return invalid_pattern_report(pattern.raw(), error),
+                };
+                let plan = plan_resolution(&parsed, constraints.clone(), &context);
+                if purpose == ResolutionPurpose::Restore {
+                    return ResolutionReport {
+                        raw_pattern: pattern.raw().to_string(),
+                        selection_state: plan.selection_state,
+                        candidates: plan.candidates,
+                        locations: Vec::new(),
+                        diagnostics: plan.diagnostics,
+                    };
+                }
+                match match_resolution_plan(&plan) {
+                    Ok(report) => report,
+                    Err(error) => ResolutionReport {
+                        raw_pattern: pattern.raw().to_string(),
+                        selection_state: plan.selection_state,
+                        candidates: plan.candidates,
+                        locations: Vec::new(),
+                        diagnostics: vec![ResolutionDiagnostic {
+                            kind: ResolutionDiagnosticKind::InvalidGlob,
+                            message: error.to_string(),
+                        }],
+                    },
+                }
+            }
+        }
+    }
+}
+
+fn resolution_context(config: &Config, game: &Game, device_id: &str) -> ResolutionContext {
+    let mut roots = Vec::new();
+    let mut accounts = Vec::new();
+    let mut installations = Vec::new();
+    if let Some(device) = config.devices.get(device_id) {
+        for resource in &device.resources {
+            let id = resource_id(resource.id);
+            match &resource.kind {
+                DeviceResourceKind::GameRoot { store, path } => roots.push(GameRootCandidate {
+                    id,
+                    store: *store,
+                    path: PathBuf::from(path),
+                }),
+                DeviceResourceKind::StoreAccount { store, user_id } => {
+                    accounts.push(StoreAccountCandidate {
+                        id,
+                        store: *store,
+                        user_id: user_id.clone(),
+                    });
+                }
+                DeviceResourceKind::GameInstallation {
+                    root_id,
+                    store,
+                    install_dir,
+                    path,
+                    store_game_id,
+                } => {
+                    let applies = game.ludusavi_meta.as_ref().is_none_or(|meta| {
+                        meta.install_dirs
+                            .iter()
+                            .any(|candidate| candidate.eq_ignore_ascii_case(install_dir))
+                            || store_game_id.as_deref().is_some_and(|id| {
+                                meta.store_game_id(*store)
+                                    .is_some_and(|candidate| candidate == id)
+                            })
+                    });
+                    if applies {
+                        installations.push(GameInstallationCandidate {
+                            id,
+                            root_id: resource_id(*root_id),
+                            store: *store,
+                            install_dir: install_dir.clone(),
+                            install_path: PathBuf::from(path),
+                            store_game_id: store_game_id.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    add_detected_steam_resources(game, &mut roots, &mut accounts, &mut installations);
+
+    let binding = game.device_bindings.get(device_id);
+    ResolutionContext {
+        platform: PlatformKind::host(),
+        platform_paths: host_platform_paths(),
+        roots,
+        accounts,
+        installations,
+        store_game_ids: game
+            .ludusavi_meta
+            .iter()
+            .flat_map(|meta| &meta.store_game_ids)
+            .map(|entry| (entry.store, entry.id.clone()))
+            .collect::<BTreeMap<_, _>>(),
+        selection: ResolutionSelection {
+            root_ids: binding.and_then(|value| selected_ids(value.root_ids.as_deref())),
+            account_ids: binding.and_then(|value| selected_ids(value.account_ids.as_deref())),
+            installation_ids: binding
+                .and_then(|value| selected_ids(value.installation_ids.as_deref())),
+        },
+    }
+}
+
+fn add_detected_steam_resources(
+    game: &Game,
+    roots: &mut Vec<GameRootCandidate>,
+    accounts: &mut Vec<StoreAccountCandidate>,
+    installations: &mut Vec<GameInstallationCandidate>,
+) {
+    let libraries = crate::steam::get_steam_library_paths().unwrap_or_default();
+    for library in &libraries {
+        if roots.iter().any(|root| same_path(&root.path, library)) {
+            continue;
+        }
+        roots.push(GameRootCandidate {
+            id: detected_id("steam-root", &library.to_string_lossy()),
+            store: crate::path_pattern::StoreKind::Steam,
+            path: library.clone(),
+        });
+    }
+    for account in crate::steam::detect_steam_user_ids().unwrap_or_default() {
+        if accounts.iter().any(|known| {
+            known.store == crate::path_pattern::StoreKind::Steam && known.user_id == account.user_id
+        }) {
+            continue;
+        }
+        accounts.push(StoreAccountCandidate {
+            id: detected_id("steam-account", &account.user_id),
+            store: crate::path_pattern::StoreKind::Steam,
+            user_id: account.user_id,
+        });
+    }
+
+    let Some(meta) = &game.ludusavi_meta else {
+        return;
+    };
+    let games = crate::steam::scan_all_installed_games().unwrap_or_default();
+    for install_dir in &meta.install_dirs {
+        let Some(installed) = games.get(&install_dir.to_lowercase()) else {
+            continue;
+        };
+        let Some(root) = roots.iter().find(|root| {
+            root.store == crate::path_pattern::StoreKind::Steam
+                && installed
+                    .install_path
+                    .starts_with(root.path.join("steamapps").join("common"))
+        }) else {
+            continue;
+        };
+        if installations
+            .iter()
+            .any(|known| same_path(&known.install_path, &installed.install_path))
+        {
+            continue;
+        }
+        installations.push(GameInstallationCandidate {
+            id: detected_id("steam-install", &installed.install_path.to_string_lossy()),
+            root_id: root.id.clone(),
+            store: crate::path_pattern::StoreKind::Steam,
+            install_dir: installed.install_dir.clone(),
+            install_path: installed.install_path.clone(),
+            store_game_id: Some(installed.app_id.to_string()),
+        });
+    }
+}
+
+fn detected_id(kind: &str, value: &str) -> String {
+    format!(
+        "detected:{kind}:{}",
+        value.replace('\\', "/").to_lowercase()
+    )
+}
+
+fn same_path(left: &Path, right: &Path) -> bool {
+    left.to_string_lossy()
+        .replace('\\', "/")
+        .eq_ignore_ascii_case(&right.to_string_lossy().replace('\\', "/"))
+}
+
+fn selected_ids(ids: Option<&[u32]>) -> Option<BTreeSet<String>> {
+    ids.map(|ids| ids.iter().copied().map(resource_id).collect())
+}
+
+fn resource_id(id: u32) -> String {
+    format!("resource:{id}")
+}
+
+fn host_platform_paths() -> PlatformPaths {
+    let home = dirs::home_dir();
+    PlatformPaths {
+        home: home.clone(),
+        os_user_name: Some(whoami::username()),
+        win_app_data: dirs::data_dir(),
+        win_local_app_data: dirs::data_local_dir(),
+        win_local_app_data_low: home.map(|path| path.join("AppData").join("LocalLow")),
+        win_documents: dirs::document_dir(),
+        win_public: std::env::var_os("PUBLIC").map(PathBuf::from),
+        win_program_data: std::env::var_os("PROGRAMDATA").map(PathBuf::from),
+        win_dir: std::env::var_os("WINDIR").map(PathBuf::from),
+        xdg_data: None,
+        xdg_config: None,
+    }
+}
+
+fn resolve_concrete(
+    path: Option<&String>,
+    unit_type: &SaveUnitType,
+    path_context: Option<&crate::path_resolver::PathContext>,
+    purpose: ResolutionPurpose,
+) -> ResolutionReport {
+    let Some(path) = path else {
+        return blocked_report(
+            "",
+            "this save location is not configured for the current device",
+        );
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    if matches!(unit_type, SaveUnitType::WinRegistry) {
+        return empty_concrete_report(path);
+    }
+
+    let resolved = match crate::path_resolver::resolve_path_explicit(path, path_context) {
+        Ok(resolved) => resolved,
+        Err(error) => return blocked_report(path, &error.to_string()),
+    };
+    let source = resolved.as_path();
+    if purpose == ResolutionPurpose::Capture {
+        let exists = match unit_type {
+            SaveUnitType::File => source.is_file(),
+            SaveUnitType::Folder => source.is_dir(),
+            SaveUnitType::WinRegistry => {
+                match crate::backup::registry::registry_key_exists(&resolved.to_string_lossy()) {
+                    Ok(exists) => exists,
+                    Err(error) => return blocked_report(path, &error.to_string()),
+                }
+            }
+        };
+        if !exists {
+            return blocked_report(path, "the configured save location is unavailable");
+        }
+    }
+    let kind = match unit_type {
+        SaveUnitType::File => ResolvedLocationKind::File,
+        SaveUnitType::Folder => ResolvedLocationKind::Directory,
+        SaveUnitType::WinRegistry => ResolvedLocationKind::Registry,
+    };
+    ResolutionReport {
+        raw_pattern: path.clone(),
+        selection_state: ResolutionSelectionState::Explicit {
+            candidate_ids: vec!["concrete".to_string()],
+        },
+        candidates: vec![CandidateExpression {
+            id: "concrete".to_string(),
+            expression: globset::escape(&resolved.to_string_lossy()),
+            logical_anchor: source
+                .parent()
+                .unwrap_or(source)
+                .to_string_lossy()
+                .into_owned(),
+            dimensions: CandidateDimensions::default(),
+            case_sensitive: !cfg!(target_os = "windows"),
+        }],
+        locations: vec![ResolvedSaveLocation {
+            path: resolved.to_string_lossy().into_owned(),
+            kind,
+            candidate_id: "concrete".to_string(),
+            logical_anchor: source
+                .parent()
+                .unwrap_or(source)
+                .to_string_lossy()
+                .into_owned(),
+            dimensions: CandidateDimensions::default(),
+        }],
+        diagnostics: Vec::new(),
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn empty_concrete_report(path: &str) -> ResolutionReport {
+    ResolutionReport {
+        raw_pattern: path.to_string(),
+        selection_state: ResolutionSelectionState::Explicit {
+            candidate_ids: vec!["concrete".to_string()],
+        },
+        candidates: Vec::new(),
+        locations: Vec::new(),
+        diagnostics: Vec::new(),
+    }
+}
+
+fn blocked_report(raw: &str, message: &str) -> ResolutionReport {
+    ResolutionReport {
+        raw_pattern: raw.to_string(),
+        selection_state: ResolutionSelectionState::Missing,
+        candidates: Vec::new(),
+        locations: Vec::new(),
+        diagnostics: vec![ResolutionDiagnostic {
+            kind: ResolutionDiagnosticKind::NoCandidate,
+            message: message.to_string(),
+        }],
+    }
+}
+
+fn invalid_pattern_report(raw: &str, error: PathPatternError) -> ResolutionReport {
+    let kind = match error {
+        PathPatternError::InvalidGlob { .. } => ResolutionDiagnosticKind::InvalidGlob,
+        _ => ResolutionDiagnosticKind::UnknownPlaceholder,
+    };
+    ResolutionReport {
+        raw_pattern: raw.to_string(),
+        selection_state: ResolutionSelectionState::Missing,
+        candidates: Vec::new(),
+        locations: Vec::new(),
+        diagnostics: vec![ResolutionDiagnostic {
+            kind,
+            message: error.to_string(),
+        }],
+    }
+}
+
+#[cfg(test)]
+mod concrete_tests {
+    use super::*;
+
+    #[test]
+    fn concrete_paths_resolve_placeholders_before_preflight() {
+        let temp = temp_dir::TempDir::new().unwrap();
+        std::fs::write(temp.path().join("save.dat"), b"save").unwrap();
+        let context = crate::path_resolver::PathContext {
+            game_roots: vec![temp.path().to_string_lossy().into_owned()],
+            ..Default::default()
+        };
+
+        let report = resolve_concrete(
+            Some(&"<root>/save.dat".to_string()),
+            &SaveUnitType::File,
+            Some(&context),
+            ResolutionPurpose::Capture,
+        );
+
+        assert_eq!(report.locations.len(), 1);
+        assert_eq!(
+            PathBuf::from(&report.candidates[0].expression),
+            temp.path().join("save.dat")
+        );
+        assert_eq!(
+            PathBuf::from(&report.locations[0].path),
+            temp.path().join("save.dat")
+        );
+    }
+
+    #[test]
+    fn concrete_candidate_escapes_glob_characters_but_keeps_the_literal_target() {
+        let temp = temp_dir::TempDir::new().unwrap();
+        let save = temp.path().join("Games[Main]").join("slot*.sav");
+        let path = save.to_string_lossy().into_owned();
+
+        let report = resolve_concrete(
+            Some(&path),
+            &SaveUnitType::File,
+            None,
+            ResolutionPurpose::Restore,
+        );
+
+        assert_eq!(report.candidates.len(), 1);
+        let candidate = &report.candidates[0];
+        assert!(candidate.is_exact());
+        assert_eq!(candidate.exact_target_path(), Some(save));
+    }
+
+    #[test]
+    fn concrete_restore_targets_do_not_need_to_exist() {
+        let temp = temp_dir::TempDir::new().unwrap();
+        let target = temp.path().join("missing").join("save.dat");
+
+        let report = resolve_concrete(
+            Some(&target.to_string_lossy().into_owned()),
+            &SaveUnitType::File,
+            None,
+            ResolutionPurpose::Restore,
+        );
+
+        assert_eq!(report.candidates.len(), 1);
+        assert_eq!(PathBuf::from(&report.candidates[0].expression), target);
+        assert!(report.diagnostics.is_empty());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn unsupported_registry_units_are_non_blocking() {
+        let report = resolve_concrete(
+            Some(&"HKEY_CURRENT_USER/Software/Game".to_string()),
+            &SaveUnitType::WinRegistry,
+            None,
+            ResolutionPurpose::Capture,
+        );
+
+        assert!(report.locations.is_empty());
+        assert!(report.diagnostics.is_empty());
+        assert!(matches!(
+            report.selection_state,
+            ResolutionSelectionState::Explicit { .. }
+        ));
+    }
+}

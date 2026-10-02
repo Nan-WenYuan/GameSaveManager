@@ -1,0 +1,152 @@
+<script lang="ts" setup>
+import { computed, inject } from 'vue';
+import { ChevronDown, ChevronRight, Folder, X } from '@lucide/vue';
+import { $t } from '../i18n';
+import type { FavoriteTreeNode } from '../api/commands';
+import { FAVORITE_TREE_CTX } from './favoriteTreeContext';
+import { KButton, KTooltip } from '../ui/kit';
+
+const props = defineProps<{
+  node: FavoriteTreeNode;
+  depth: number;
+}>();
+
+const ctx = inject(FAVORITE_TREE_CTX)!;
+// 解构出 ref，模板里才能自动解包
+const { editMode } = ctx;
+
+const isOpen = computed(() => ctx.searching.value || ctx.expandedIds.value.has(props.node.node_id));
+const isActive = computed(() => ctx.isActiveLeaf(props.node));
+const dropClass = computed(() => {
+  const target = ctx.dropTarget.value;
+  return target && target.id === props.node.node_id ? `drop-${target.pos}` : '';
+});
+</script>
+
+<template>
+  <div
+    class="fav-row"
+    :class="[node.is_leaf ? 'leaf' : 'folder', dropClass, { active: isActive }]"
+    :aria-current="isActive ? 'page' : undefined"
+    :title="node.label"
+    :style="{ paddingLeft: `${8 + depth * 16}px` }"
+    :draggable="editMode"
+    @click="node.is_leaf ? ctx.clickLeaf(node) : ctx.toggleExpand(node.node_id)"
+    @dragstart="ctx.onDragStart(node.node_id, $event)"
+    @dragover="ctx.onDragOver(node.node_id, node.is_leaf, $event)"
+    @dragleave="ctx.onDragLeave(node.node_id)"
+    @drop="ctx.onDrop(node.node_id)"
+    @dragend="ctx.onDragEnd()"
+  >
+    <template v-if="!node.is_leaf">
+      <component :is="isOpen ? ChevronDown : ChevronRight" :size="13" class="fav-chevron" />
+      <Folder :size="13" class="fav-folder-icon" />
+    </template>
+    <span v-else class="fav-leaf-indent" />
+    <span class="fav-label">{{ node.label }}</span>
+    <KTooltip v-if="editMode" :content="$t('favorite.remove')">
+      <KButton
+        variant="ghost"
+        size="sm"
+        class="fav-remove"
+        :aria-label="$t('favorite.remove')"
+        @click.stop="ctx.removeNode(node.node_id)"
+      >
+        <template #icon><X :size="16" aria-hidden="true" /></template>
+      </KButton>
+    </KTooltip>
+  </div>
+  <template v-if="!node.is_leaf && isOpen">
+    <FavoriteTreeNode
+      v-for="child in node.children ?? []"
+      :key="child.node_id"
+      :node="child"
+      :depth="depth + 1"
+    />
+  </template>
+</template>
+
+<style scoped>
+.fav-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  /* preflight 关闭期:必须 border-box,否则 width:100%+padding 横向溢出,
+     嵌套层级越深 × 按钮被裁掉越多(depth≥1 时完全不可见) */
+  box-sizing: border-box;
+  padding: 5px 8px;
+  padding-right: 40px;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  transition: background-color 0.15s;
+}
+
+.fav-row:hover {
+  background-color: var(--surface-2);
+}
+
+.fav-row.active {
+  background-color: var(--surface-2);
+  font-weight: 600;
+}
+
+.fav-chevron {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.fav-folder-icon {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.fav-leaf-indent {
+  width: 17px;
+  flex-shrink: 0;
+}
+
+.fav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.fav-remove {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+}
+
+.fav-remove:hover {
+  color: var(--danger);
+}
+
+/* 拖拽落点反馈（中性色，不占琥珀） */
+.fav-row.drop-before {
+  border-top-color: var(--text);
+}
+
+.fav-row.drop-after {
+  border-bottom-color: var(--text);
+}
+
+.fav-row.drop-inner {
+  background-color: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.fav-row[draggable='true'] {
+  cursor: grab;
+}
+</style>

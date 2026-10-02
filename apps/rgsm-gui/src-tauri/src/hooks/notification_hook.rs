@@ -1,0 +1,142 @@
+//! Built-in hook for user-facing notifications, sounds, and frontend events.
+//!
+//! It runs late in the pipeline so visible feedback reflects already-committed
+//! lifecycle changes.
+
+use anyhow::Result;
+use async_trait::async_trait;
+use log::info;
+use tauri::AppHandle;
+
+use crate::quick_actions::{
+    QuickActionOperation, QuickActionStatus, QuickActionType, emit_quick_action_event,
+    should_show_auto_backup_notification,
+};
+use crate::sound::{QuickActionSoundEffect, play_quick_action_sound};
+use rgsm_core::backup::CreatedBy;
+use rgsm_core::config::QuickActionSoundPreferences;
+use rgsm_core::preclude::show_notification;
+
+use rgsm_core::hooks::{HookSource, LifecycleHook, SnapshotAppliedCtx, SnapshotCreatedCtx};
+
+/// Plays sounds, shows system notifications, and emits frontend events
+/// for quick-action / timer sources.
+///
+/// Priority 90 — runs last so all data mutations are already committed.
+pub struct NotificationHook {
+    app: AppHandle,
+}
+
+impl NotificationHook {
+    pub fn new(app: AppHandle) -> Self {
+        Self { app }
+    }
+
+    /// Map HookSource to QuickActionType. Returns None for non-quick-action sources.
+    fn to_quick_action_type(
+        source: &HookSource,
+        created_by: Option<&CreatedBy>,
+    ) -> Option<QuickActionType> {
+        match source {
+            HookSource::TimerAutoBackup => Some(QuickActionType::Timer),
+            HookSource::QuickActionHotkey => Some(QuickActionType::Hotkey),
+            HookSource::QuickActionTray => Some(QuickActionType::Tray),
+            HookSource::ProcessMonitorAutoBackup => match created_by {
+                Some(CreatedBy::ProcessStart) => Some(QuickActionType::ProcessStart),
+                Some(CreatedBy::ProcessExit) => Some(QuickActionType::ProcessExit),
+                _ => Some(QuickActionType::ProcessInterval),
+            },
+            _ => None,
+        }
+    }
+
+    fn notify_success(
+        &self,
+        config: &rgsm_core::config::Config,
+        qa_type: QuickActionType,
+        operation: QuickActionOperation,
+        game_name: &str,
+    ) {
+        let quick_settings = &config.quick_action;
+        let sound_prefs = QuickActionSoundPreferences::from(quick_settings);
+
+        // System notification (automatic sources respect prompt_when_auto_backup)
+        let should_notify = should_show_auto_backup_notification(config, qa_type);
+        if quick_settings.enable_notification && should_notify {
+            let op_key = match operation {
+                QuickActionOperation::Backup => rust_i18n::t!("backend.tray.quick_backup"),
+                QuickActionOperation::Apply => rust_i18n::t!("backend.tray.quick_apply"),
+            };
+            show_notification(
+                rust_i18n::t!("backend.tray.success"),
+                format!(
+                    "{:#?} {} {}",
+                    game_name,
+                    op_key,
+                    rust_i18n::t!("backend.tray.success")
+                ),
+            );
+        }
+
+        // Sound
+        play_quick_action_sound(&self.app, sound_prefs, QuickActionSoundEffect::Success);
+
+        // Frontend event
+        emit_quick_action_event(
+            &self.app,
+            qa_type,
+            operation,
+            QuickActionStatus::Success,
+            Some(game_name.to_string()),
+        );
+    }
+}
+
+#[async_trait]
+impl LifecycleHook for NotificationHook {
+    fn name(&self) -> &str {
+        "NotificationHook"
+    }
+
+    fn priority(&self) -> u32 {
+        90
+    }
+
+    async fn on_snapshot_created(&self, ctx: &mut SnapshotCreatedCtx) -> Result<()> {
+        if let Some(qa_type) =
+            Self::to_quick_action_type(&ctx.source, Some(&ctx.snapshot.created_by))
+        {
+            info!(
+                target: "rgsm::hooks::notification",
+                "Snapshot created via {:?} for {} — sending notification",
+                ctx.source, ctx.game.name
+            );
+            self.notify_success(
+                &ctx.config,
+                qa_type,
+                QuickActionOperation::Backup,
+                &ctx.game.name,
+            );
+        }
+        Ok(())
+    }
+
+    async fn on_snapshot_applied(&self, ctx: &SnapshotAppliedCtx) -> Result<()> {
+        if let Some(qa_type) =
+            Self::to_quick_action_type(&ctx.source, Some(&ctx.snapshot.created_by))
+        {
+            info!(
+                target: "rgsm::hooks::notification",
+                "Snapshot applied via {:?} for {} — sending notification",
+                ctx.source, ctx.game.name
+            );
+            self.notify_success(
+                &ctx.config,
+                qa_type,
+                QuickActionOperation::Apply,
+                &ctx.game.name,
+            );
+        }
+        Ok(())
+    }
+}

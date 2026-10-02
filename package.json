@@ -1,0 +1,23 @@
+{
+  "name": "game-save-manager",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --dir apps/rgsm-gui dev",
+    "build": "pnpm --dir apps/rgsm-gui build",
+    "web:dev": "pnpm --dir apps/rgsm-gui web:dev",
+    "web:build": "pnpm --dir apps/rgsm-gui web:build",
+    "web:test": "pnpm --dir apps/rgsm-gui web:test && node --test .agents/skills/rgsm-gui-acceptance/scripts/device.test.mjs",
+    "web:e2e": "pnpm --dir apps/rgsm-gui web:e2e",
+    "web:e2e:desktop": "pnpm --dir apps/rgsm-gui web:e2e:desktop",
+    "web:typecheck": "pnpm --dir apps/rgsm-gui web:typecheck",
+    "web:format": "pnpm --dir apps/rgsm-gui web:format",
+    "web:format:fix": "pnpm --dir apps/rgsm-gui web:format:fix",
+    "web:lint": "pnpm --dir apps/rgsm-gui web:lint",
+    "web:lint:fix": "pnpm --dir apps/rgsm-gui web:lint:fix",
+    "docs:dev": "pnpm --dir apps/rgsm-docs dev",
+    "docs:build": "pnpm --dir apps/rgsm-docs build",
+    "portable": "pnpm --dir apps/rgsm-gui portable",
+    "release": "pnpm --dir apps/rgsm-gui exec tauri build --no-bundle && node scripts/publish-release.mjs"
+  }
+}

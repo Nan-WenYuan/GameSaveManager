@@ -1,0 +1,391 @@
+<script lang="ts" setup>
+import { computed, onMounted, ref, watch } from 'vue';
+import { Cloud, Home, Plus, Settings, Star } from '@lucide/vue';
+import { $t } from '../i18n';
+import { error } from '../utils/logger';
+import { commands, type Game } from '../api/commands';
+import { getGameManagementPath } from '../composables/useGameManagementRoute';
+import { resolveManagementGame } from '../utils/appRoutes';
+import { useAddGameDrawer } from '../composables/useAddGameDrawer';
+import { useSidebarResize } from '../composables/useSidebarResize';
+import { refreshCloudLibraryIfStale } from '../composables/useCloudLibrary';
+import KButton from '../ui/kit/KButton.vue';
+import KInput from '../ui/kit/KInput.vue';
+import KSegmented from '../ui/kit/KSegmented.vue';
+import FavoriteTree from './FavoriteTree.vue';
+import {
+  collectFavoriteGameIds,
+  createGameFavorite,
+  removeFavoriteGame,
+} from './favoriteTreeContext';
+
+const { config, isGameVisible, saveConfig, whenConfigReady } = useConfig();
+const { sortedGames } = useSaveListSort();
+const { isResizing, startResize } = useSidebarResize({
+  minWidth: 200,
+  maxWidth: 400,
+});
+
+const router = useRouter();
+const { open: openAddGame } = useAddGameDrawer();
+const route = useRoute();
+const activeGameId = computed(
+  () => resolveManagementGame(config.value.games, route.fullPath)?.storage_key
+);
+const searchQuery = ref('');
+
+// ——— 导航（主页/云同步/设置/关于）———
+const navLinks = computed(() => [
+  { text: $t('personal.library'), link: '/', icon: Home },
+  { text: $t('personal.cloud_backup'), link: '/SyncSettings', icon: Cloud },
+  { text: $t('sidebar.settings'), link: '/Settings', icon: Settings },
+]);
+
+// ——— 游戏列表（「全部」视图） ———
+const games = computed(() =>
+  sortedGames(config.value.games.filter((game) => isGameVisible(game.storage_key, game.name)))
+);
+
+const viewOptions = computed(() => [
+  { value: 'favorites' as const, label: $t('misc.favorites') },
+  { value: 'all' as const, label: $t('sidebar.all_games') },
+]);
+
+const visibleGames = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase();
+  if (!query) return games.value;
+  return games.value.filter((game) => game.name.toLowerCase().includes(query));
+});
+
+// 收藏叶子集合：「全部」视图的星标状态；树本身的组织在 FavoriteTree 内
+const favoriteIds = computed(() =>
+  collectFavoriteGameIds(config.value.favorites, config.value.games)
+);
+
+async function toggleFavorite(game: Game) {
+  if (!config.value) return;
+  const favorites = [...(config.value.favorites ?? [])];
+  if (favoriteIds.value.has(game.storage_key ?? '')) {
+    removeFavoriteGame(favorites, game.storage_key ?? '', config.value.games);
+  } else {
+    favorites.push(createGameFavorite(game));
+  }
+  config.value.favorites = favorites;
+  await saveConfig();
+}
+
+const viewMode = ref<'favorites' | 'all'>('all');
+function applyDefaultGameList() {
+  viewMode.value = 'all';
+}
+onMounted(async () => {
+  if (await whenConfigReady()) applyDefaultGameList();
+});
+watch(() => config.value.settings.appearance?.default_game_list, applyDefaultGameList);
+
+// ——— 状态：自动备份圆点 ———
+const autoBackupGames = ref<Set<string>>(new Set());
+
+async function refreshAutoBackup() {
+  try {
+    const result = await commands.getAutoBackupStatus();
+    if (result.status === 'ok') {
+      autoBackupGames.value = new Set(result.data.map((row) => row.game_id));
+    }
+  } catch (e) {
+    error(`refresh auto-backup status error: ${e}`);
+  }
+}
+
+onMounted(refreshAutoBackup);
+// 定时备份与进程自动化配置变化都会改变状态点;config 引用替换即触发
+watch(
+  () => [
+    (config.value?.games ?? [])
+      .map((game) => `${game.storage_key}:${game.auto_backup ? 1 : 0}`)
+      .join('|'),
+    JSON.stringify(config.value?.quick_action?.game_automations ?? []),
+  ],
+  refreshAutoBackup
+);
+
+function isActive(path: string): boolean {
+  return route.fullPath === path;
+}
+
+function goGame(game: Game) {
+  router.push(getGameManagementPath(game));
+}
+
+function navigatePage(path: string) {
+  void router.push(path);
+  if (path === '/SyncSettings') void refreshCloudLibraryIfStale();
+}
+</script>
+
+<template>
+  <div class="sidebar-wrapper">
+    <aside class="sidebar">
+      <div class="sidebar-search">
+        <KInput v-model="searchQuery" size="sm" :placeholder="$t('misc.search')" />
+      </div>
+
+      <nav class="sidebar-nav">
+        <button
+          v-for="link in navLinks"
+          :key="link.link"
+          type="button"
+          class="side-row nav-row"
+          :class="{ active: isActive(link.link) }"
+          :aria-current="isActive(link.link) ? 'page' : undefined"
+          @click="navigatePage(link.link)"
+        >
+          <component :is="link.icon" :size="15" class="row-icon" />
+          <span class="row-text">{{ link.text }}</span>
+        </button>
+      </nav>
+
+      <div class="games-head">
+        <span class="games-title">{{ $t('sidebar.games') }}</span>
+        <KButton variant="ghost" size="sm" @click="openAddGame()">
+          <template #icon><Plus :size="16" /></template>
+          {{ $t('sidebar.add_game') }}
+        </KButton>
+      </div>
+
+      <div class="game-view-switch">
+        <KSegmented v-model="viewMode" :options="viewOptions" :aria-label="$t('sidebar.games')" />
+      </div>
+
+      <div class="games-scroll">
+        <FavoriteTree
+          v-show="viewMode === 'favorites'"
+          :search-query="searchQuery"
+          :active-game-id="activeGameId"
+        />
+
+        <div v-show="viewMode === 'all'" class="all-list">
+          <button
+            v-for="game in visibleGames"
+            :key="game.storage_key"
+            type="button"
+            class="side-row game-row"
+            :class="{ active: !!game.storage_key && activeGameId === game.storage_key }"
+            :aria-current="activeGameId === game.storage_key ? 'page' : undefined"
+            :title="game.name"
+            @click="goGame(game)"
+          >
+            <span
+              class="game-dot"
+              :class="{ on: autoBackupGames.has(game.storage_key ?? '') }"
+              :title="
+                autoBackupGames.has(game.storage_key ?? '')
+                  ? $t('sidebar.auto_backup_on')
+                  : undefined
+              "
+            />
+            <span class="row-text">{{ game.name }}</span>
+            <span
+              class="game-star"
+              :class="{ faved: favoriteIds.has(game.storage_key ?? '') }"
+              role="button"
+              :aria-label="
+                favoriteIds.has(game.storage_key ?? '')
+                  ? $t('favorite.remove')
+                  : $t('favorite.add_to_favorite')
+              "
+              @click.stop="toggleFavorite(game)"
+            >
+              <Star
+                :size="13"
+                :fill="favoriteIds.has(game.storage_key ?? '') ? 'currentColor' : 'none'"
+              />
+            </span>
+          </button>
+          <p v-if="visibleGames.length === 0 && searchQuery.trim()" class="empty-hint">
+            {{ $t('misc.no_search_results') }}
+          </p>
+        </div>
+      </div>
+    </aside>
+    <!-- 拖动调整大小的区域 -->
+    <div class="resize-handle" :class="{ active: isResizing }" @mousedown="startResize" />
+  </div>
+</template>
+
+<style scoped>
+.sidebar-wrapper {
+  position: relative;
+  display: flex;
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  font-family: var(--font-sans-stack);
+}
+
+.sidebar-search {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.side-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.side-row:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.side-row.active {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.side-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.row-icon {
+  flex-shrink: 0;
+}
+
+.row-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.games-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 6px;
+}
+
+.games-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.games-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 8px 12px;
+}
+
+.all-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.game-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+}
+
+.game-dot.on {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.game-star {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
+}
+
+.game-row:hover .game-star,
+.game-star.faved {
+  opacity: 1;
+}
+
+.game-star.faved {
+  color: var(--text);
+}
+
+.game-star:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.empty-hint {
+  margin: 12px 8px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* 拖动调整大小的区域 */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.2s;
+  z-index: 100;
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+  background-color: var(--border-strong);
+}
+.game-view-switch {
+  flex-shrink: 0;
+  padding: 0 8px 8px;
+}
+</style>

@@ -1,0 +1,37 @@
+[workspace]
+members = [
+    "apps/rgsm-gui/src-tauri",
+    "apps/rgsm-cli",
+    "apps/rgsm-tui",
+    "crates/rgsm-core",
+    "crates/rgsm-ffi",
+]
+resolver = "2"
+
+[workspace.package]
+version = "1.12.1"
+edition = "2024"
+rust-version = "1.97.0"
+license = "AGPL-3.0-only"
+
+[workspace.dependencies]
+anyhow = "1.0.102"
+async-trait = "0.1"
+criterion = "0.8.2"
+log = "0.4.29"
+open = "5.3.3"
+rgsm-core = { path = "crates/rgsm-core", default-features = false }
+rust-i18n = "3.1.5"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.149"
+specta = { version = "=2.0.0-rc.22", features = ["derive"] }
+temp-dir = "0.1.16"
+thiserror = "2.0.18"
+tokio = { version = "1.50.0", features = ["full"] }
+tokio-util = { version = "0.7.18", features = ["full"] }
+uuid = { version = "1.24.0", features = ["v4"] }
+winreg = "0.55"
+zip = { version = "5.1.1", features = ["deflate", "bzip2", "zstd"] }
+sevenz-rust2 = { version = "=0.21.3", default-features = false, features = ["compress", "deflate", "util"] }
+libc = "0.2.186"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }

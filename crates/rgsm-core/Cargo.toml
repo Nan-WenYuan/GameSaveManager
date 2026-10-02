@@ -1,0 +1,60 @@
+[package]
+name = "rgsm-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Core library for Game Save Manager — backup, config, cloud sync, and hook pipeline"
+license.workspace = true
+
+[lib]
+name = "rgsm_core"
+
+[features]
+default = ["bundled-manifest"]
+bundled-manifest = ["dep:rust-embed"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml = "0.9"
+log.workspace = true
+anyhow.workspace = true
+semver = "1.0.26"
+thiserror.workspace = true
+chrono = "0.4.44"
+tokio.workspace = true
+tokio-util.workspace = true
+opendal = { version = "0.57.0", features = ["services-webdav", "services-s3", "services-fs"] }
+zip.workspace = true
+sevenz-rust2.workspace = true
+fs_extra = "1.3.0"
+filetime = "0.2"
+xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
+open.workspace = true
+temp-dir.workspace = true
+notify-rust = "4.12.0"
+hostname = "0.4.2"
+dirs = "6.0.0"
+whoami = "1.6.1"
+machine-uid = "0.5.4"
+reqwest = "0.12"
+lazy_static = "1.5"
+rust-embed = { version = "8.11.0", optional = true, features = ["compression", "debug-embed", "include-exclude"] }
+font-kit = "0.14"
+base64 = "0.22.1"
+globetter = "0.2.0"
+globset = "0.4.15"
+async-trait.workspace = true
+futures-util = "0.3.32"
+specta.workspace = true
+rust-i18n.workspace = true
+keyvalues-serde = "0.2"
+utoipa = "5"
+uuid.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg.workspace = true
+windows-sys = { workspace = true, features = ["Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc.workspace = true

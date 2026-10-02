@@ -1,0 +1,98 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
+
+use anyhow::Result;
+use async_trait::async_trait;
+use log::info;
+use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
+
+use super::{HookSource, LifecycleHook, SnapshotCreatedCtx};
+use crate::cloud_sync::v2::{CloudLibraryTarget, SnapshotSyncCoordinator};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapshotSyncTarget {
+    pub activation_revision: u64,
+    pub local_baseline: BTreeSet<String>,
+    pub retention_limit: Option<u32>,
+    pub upload_new_archives: bool,
+}
+
+pub struct V2SnapshotSyncHook {
+    target: CloudLibraryTarget,
+    coordinator: SnapshotSyncCoordinator,
+    targets: BTreeMap<String, SnapshotSyncTarget>,
+    operation_lock: Arc<Mutex<()>>,
+}
+
+impl V2SnapshotSyncHook {
+    pub(crate) fn new(
+        target: CloudLibraryTarget,
+        coordinator: SnapshotSyncCoordinator,
+        targets: BTreeMap<String, SnapshotSyncTarget>,
+        operation_lock: Arc<Mutex<()>>,
+    ) -> Self {
+        Self {
+            target,
+            coordinator,
+            targets,
+            operation_lock,
+        }
+    }
+}
+
+#[async_trait]
+impl LifecycleHook for V2SnapshotSyncHook {
+    fn name(&self) -> &str {
+        "V2SnapshotSyncHook"
+    }
+
+    fn priority(&self) -> u32 {
+        50
+    }
+
+    async fn on_snapshot_created(&self, ctx: &mut SnapshotCreatedCtx) -> Result<()> {
+        if ctx.source == HookSource::CloudSync {
+            return Ok(());
+        }
+        let game_id = ctx.game.backup_dir_name();
+        let Some(target) = self.targets.get(game_id.as_ref()) else {
+            return Ok(());
+        };
+        let _guard = self.operation_lock.lock().await;
+        self.target.verify().await?;
+
+        let outcome = self
+            .coordinator
+            .reconcile_game_with_policy(
+                game_id.as_ref(),
+                &ctx.snapshots,
+                target.activation_revision,
+                &target.local_baseline,
+                &CancellationToken::new(),
+                crate::cloud_sync::v2::SnapshotReconcilePolicy {
+                    upload_new_archives: target.upload_new_archives,
+                },
+            )
+            .await?;
+        let retained = if let Some(limit) = target.retention_limit {
+            let retention = self
+                .coordinator
+                .enforce_retention(game_id.as_ref(), limit)
+                .await?;
+            ctx.snapshots.forget_v2_tombstones(&retention.tombstones);
+            retention.deleted
+        } else {
+            0
+        };
+        info!(
+            target: "rgsm::hooks::v2_snapshot_sync",
+            "Reconciled {} after Snapshot creation: {} published, {} uploaded, {} retained-history deletions",
+            game_id,
+            outcome.published,
+            outcome.uploaded,
+            retained,
+        );
+        Ok(())
+    }
+}

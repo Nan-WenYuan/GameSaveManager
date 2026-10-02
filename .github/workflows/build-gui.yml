@@ -1,0 +1,218 @@
+name: Build GUI
+
+on:
+  workflow_dispatch:
+    inputs:
+      win:
+        description: "Build Windows"
+        type: boolean
+        default: false
+      linux:
+        description: "Build Linux"
+        type: boolean
+        default: false
+      macos:
+        description: "Build macOS"
+        type: boolean
+        default: false
+      windows_portable_slim:
+        description: "Build Windows portable slim"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      win:
+        type: boolean
+        default: false
+      linux:
+        type: boolean
+        default: false
+      macos:
+        type: boolean
+        default: false
+      windows_portable_slim:
+        type: boolean
+        default: false
+      release_id:
+        type: string
+        default: ""
+      release_tag:
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-win:
+    if: inputs.win
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+        with:
+          version: latest
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install
+      - uses: Swatinem/rust-cache@v2
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: pnpm tauri
+          projectPath: apps/rgsm-gui
+          releaseId: ${{ inputs.release_id }}
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/release/bundle/nsis/RGSM_*_x64-setup.exe
+          if-no-files-found: error
+          archive: false
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/release/bundle/msi/RGSM_*_x64_en-US.msi
+          if-no-files-found: error
+          archive: false
+
+  build-linux:
+    if: inputs.linux
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+        with:
+          version: latest
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev pkg-config libasound2-dev
+      - run: pnpm install
+      - uses: Swatinem/rust-cache@v2
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: pnpm tauri
+          projectPath: apps/rgsm-gui
+          releaseId: ${{ inputs.release_id }}
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/release/bundle/deb/RGSM_*.deb
+          if-no-files-found: error
+          archive: false
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/release/bundle/rpm/RGSM-*.rpm
+          if-no-files-found: error
+          archive: false
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/release/bundle/appimage/RGSM_*.AppImage
+          if-no-files-found: error
+          archive: false
+
+  build-macos:
+    if: inputs.macos
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+        with:
+          version: latest
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - run: pnpm install
+      - uses: Swatinem/rust-cache@v2
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: pnpm tauri
+          projectPath: apps/rgsm-gui
+          releaseId: ${{ inputs.release_id }}
+          args: --target aarch64-apple-darwin
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/aarch64-apple-darwin/release/bundle/dmg/RGSM_*.dmg
+          if-no-files-found: error
+          archive: false
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
+          if-no-files-found: error
+          archive: false
+      - name: Fix macOS updater artifact name
+        if: inputs.release_id != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          VERSION="${TAG#v}"
+          RELEASE_ID="${{ inputs.release_id }}"
+          gh api "repos/${{ github.repository }}/releases/${RELEASE_ID}/assets" \
+            --jq '.[] | select(.name | test("\\.app\\.tar\\.gz")) | "\(.id)\t\(.name)"' |
+          while IFS=$'\t' read -r ASSET_ID OLD_NAME; do
+            if [[ "$OLD_NAME" != *"${VERSION}"* ]]; then
+              NEW_NAME="${OLD_NAME/RGSM_/RGSM_${VERSION}_}"
+              EXISTING_ID="$(gh api "repos/${{ github.repository }}/releases/${RELEASE_ID}/assets" \
+                --jq ".[] | select(.name == \"${NEW_NAME}\" and .id != ${ASSET_ID}) | .id" |
+                head -n 1)"
+              if [[ -n "$EXISTING_ID" ]]; then
+                gh api -X DELETE "repos/${{ github.repository }}/releases/assets/${EXISTING_ID}" >/dev/null
+                echo "Deleted existing target asset: ${NEW_NAME}"
+              fi
+              gh api -X PATCH "repos/${{ github.repository }}/releases/assets/${ASSET_ID}" \
+                -f name="${NEW_NAME}"
+              echo "Renamed: ${OLD_NAME} -> ${NEW_NAME}"
+            fi
+          done
+
+  build-windows-portable-slim:
+    if: inputs.windows_portable_slim
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+        with:
+          version: latest
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install
+      - uses: Swatinem/rust-cache@v2
+      - name: Build slim app
+        run: pnpm tauri build --config src-tauri/tauri.slim.conf.json -- --no-default-features
+        working-directory: apps/rgsm-gui
+        env:
+          VITE_WIN_PORTABLE: 1
+      - name: Build slim portable
+        run: pnpm portable
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RGSM_BUILD_VARIANT: slim
+          VITE_WIN_PORTABLE: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          path: RGSM_*_x64-portable-slim.zip
+          if-no-files-found: error
+          archive: false
