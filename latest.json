@@ -1,32 +1,32 @@
 {
-  "tag_name": "v1.12.3",
-  "body": "修复与改进：\n- 自动导入与手动保存共用提交保护，避免先提示添加失败、随后又成功。\n- 修改名称和启动路径后立即刷新，不等待附加状态查询；未改动的存档路径不重复检查，可正确清空启动路径。\n- 手动添加、编辑仅保存本地，不自动发布云端；启动时不再自动连接或刷新云端。\n- 游戏页在备份目录上方显示已设置的启动路径。\n- 修复启动时配置读取竞争，保留本地备份与移除副本的即时刷新。\n\n更新仅替换程序，保留配置与存档。基于 mcthesw/game-save-manager，遵循 AGPL-3.0-only。\n对应源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.12.3",
+  "tag_name": "v1.12.4",
+  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：18e1a908db6c3602cd0f70f8861715d32f2b74da。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.12.4；完整源码见本版本 source-1.12.4.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
     {
-      "id": 606130551,
+      "id": 610188700,
       "name": "LICENSE",
       "size": 34523,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/LICENSE"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/LICENSE"
     },
     {
-      "id": 606130223,
+      "id": 610186640,
       "name": "rgsm.exe",
-      "size": 48721408,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/rgsm.exe"
+      "size": 48727552,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/rgsm.exe"
     },
     {
-      "id": 606130525,
+      "id": 610188687,
       "name": "SHA256SUMS",
       "size": 75,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/SHA256SUMS"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/SHA256SUMS"
     },
     {
-      "id": 606130148,
-      "name": "source-1.12.3.zip",
-      "size": 7589280,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.3/source-1.12.3.zip"
+      "id": 610186267,
+      "name": "source-1.12.4.zip",
+      "size": 7589934,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/source-1.12.4.zip"
     }
   ]
 }
