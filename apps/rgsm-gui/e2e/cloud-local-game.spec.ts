@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { seedEmptyCloudWithLocalGame, readSave } from './support/cloud-fixture';
-import { createLibrary, connectLibrary, uploadSnapshot, downloadSnapshot } from './support/gui';
+import { createLibrary, connectLibrary } from './support/gui';
 import { createSnapshotForGame } from './support/local-gui';
 import { createRunRoot, hostPost } from './support/rgsm-instance';
 import { startDualSession } from './support/session';
 import { cloudPaths, readJson } from './support/cloud-assertions';
 
-test('a retained local game can enable cloud sync and send a snapshot to the other device', async ({
+test('first manual upload registers a local game without a preparation button', async ({
   browser,
 }, testInfo) => {
   const runRoot = await createRunRoot('local-game-cloud');
@@ -32,50 +32,30 @@ test('a retained local game can enable cloud sync and send a snapshot to the oth
     await createLibrary(session.pageA);
     await connectLibrary(session.pageB);
     const originalSave = await readSave(scene.deviceB);
-    const before = await hostPost(session.hostB, '/api/v1/get-local-config');
-    const row = session.pageB.locator('[data-game-id="private-game"]');
-    await expect(row.getByText('Local only', { exact: true })).toBeVisible();
-    await expect(row.getByRole('switch')).not.toBeChecked();
     const remoteBefore = await readJson(cloudPaths(scene.cloudRoot).sharedLibrary);
-    await row.getByRole('switch').click();
-    const dialog = session.pageB.getByRole('dialog', { name: 'Enable cloud sync', exact: true });
-    await expect(
-      dialog.getByText('You can then find Private game on your other devices', { exact: true })
-    ).toBeVisible();
-    await session.pageB.screenshot({
-      path: testInfo.outputPath('acceptance-enable-cloud-sync.png'),
-    });
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    const snapshot = await createSnapshotForGame(session.hostB, 'Private game', 'Manual upload');
     expect(await readJson(cloudPaths(scene.cloudRoot).sharedLibrary)).toEqual(remoteBefore);
-    expect((await hostPost(session.hostB, '/api/v1/get-local-config')).data).toEqual(before.data);
-    await row.getByRole('switch').click();
-    await dialog.getByRole('button', { name: 'Enable cloud sync', exact: true }).click();
-    await expect(dialog).toBeHidden();
-    await expect(row.getByRole('switch')).toBeChecked();
-    await expect(row.getByRole('button', { name: 'Sync mode', exact: true })).toContainText(
-      'Manual'
-    );
-    await session.pageB.screenshot({ path: testInfo.outputPath('local-game-enabled.png') });
-    const snapshot = await createSnapshotForGame(session.hostB, 'Private game', 'From device B');
-    await session.pageB.goto('/Management/Private%20game?gameId=private-game');
-    await uploadSnapshot(session.pageB, snapshot);
-    await session.pageA.goto('/SyncSettings');
-    await expect(session.pageA.locator('[data-game-id="private-game"]')).toBeVisible();
-    await session.pageA
-      .locator('[data-game-id="private-game"]')
-      .getByRole('button', { name: 'Private game', exact: true })
-      .click();
-    await downloadSnapshot(session.pageA, snapshot);
-    const aConfig = await hostPost<{ games: Array<{ name: string; storage_key: string }> }>(
-      session.hostA,
-      '/api/v1/get-local-config'
-    );
-    expect(aConfig.data.games.some((game) => game.storage_key === 'private-game')).toBe(true);
-    expect(await readSave(scene.deviceB)).toBe(originalSave);
-    expect(await readSave(scene.deviceA)).toBe(originalSave);
-    await session.pageB.reload();
     await session.pageB.goto('/SyncSettings');
-    await expect(row.getByRole('switch')).toBeChecked();
+    const row = session.pageB.locator('[data-game-id="private-game"]');
+    await expect(row).toBeVisible();
+    await expect(
+      row.getByRole('button', { name: 'Prepare cloud backup', exact: true })
+    ).toHaveCount(0);
+    await row.getByRole('button', { name: 'Upload this game', exact: true }).click();
+    await expect
+      .poll(async () => {
+        const manifest = await readJson(cloudPaths(scene.cloudRoot).manifest);
+        return JSON.stringify(manifest).includes(snapshot);
+      })
+      .toBe(true);
+    const profile = await hostPost<{
+      games: Array<{ storage_key: string; cloud_sync_enabled: boolean }>;
+    }>(session.hostB, '/api/v1/get-local-config');
+    expect(
+      profile.data.games.find((game) => game.storage_key === 'private-game')?.cloud_sync_enabled
+    ).toBe(false);
+    expect(await readSave(scene.deviceB)).toBe(originalSave);
+    await session.pageB.screenshot({ path: testInfo.outputPath('manual-first-upload.png') });
   } catch (error) {
     failed = true;
     throw error;

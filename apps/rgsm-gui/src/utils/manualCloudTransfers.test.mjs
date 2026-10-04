@@ -27,10 +27,10 @@ test('manual upload skips existing cloud copies and content conflicts', () => {
 test('manual pull skips local copies and never overwrites a content conflict', () => {
   assert.deepEqual(manualTransferPlan([game()], false), [{ gameId: 'g', snapshotId: 'cloud' }]);
 });
-test('unpublished or conflicting game definitions cannot be uploaded', () => {
+test('first upload includes local games but still blocks conflicting definitions', () => {
   assert.deepEqual(
     manualTransferPlan([game({ local_only: true }), game({ definition_conflict: true })], true),
-    []
+    [{ gameId: 'g', snapshotId: 'local' }]
   );
 });
 

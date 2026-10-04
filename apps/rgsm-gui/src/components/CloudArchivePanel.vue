@@ -196,14 +196,10 @@ onMounted(() => {
         </button>
         <div class="flex flex-wrap gap-2">
           <KButton
-            v-if="game.local_only || game.definition_conflict"
+            v-if="game.definition_conflict"
             :disabled="busy || !game.managed || Boolean(lastError)"
             @click="emit('configure', game)"
-            >{{
-              game.definition_conflict
-                ? $t('sync_settings.library.definitions.action')
-                : $t('personal.publish_game')
-            }}</KButton
+            >{{ $t('sync_settings.library.definitions.action') }}</KButton
           >
           <KButton
             size="sm"
@@ -256,7 +252,6 @@ onMounted(() => {
                     :disabled="
                       Boolean(lastError) ||
                       busy ||
-                      game.local_only ||
                       game.definition_conflict ||
                       !game.managed ||
                       snapshot.local_evidence !== 'present'

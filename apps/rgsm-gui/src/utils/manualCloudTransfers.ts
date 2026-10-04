@@ -7,7 +7,7 @@ export function manualTransferPlan(
   includeExisting = false
 ) {
   return games.flatMap((game) => {
-    if (upload && (!game.managed || game.local_only || game.definition_conflict)) return [];
+    if (upload && (!game.managed || game.definition_conflict)) return [];
     return game.snapshots
       .filter((snapshot) =>
         upload

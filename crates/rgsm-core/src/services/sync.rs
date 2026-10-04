@@ -14,9 +14,9 @@ use crate::cloud_sync::v2::{
     CloudLibraryJoinError, CloudLibraryJoinReview, CloudManifestRepository,
     CloudNamespaceClassification, CloudNamespaceDescriptor, CloudNamespaceError,
     ConflictReviewError, DeletionRegistryError, DeviceProfileRemovalError, DeviceProfileRepository,
-    DeviceProfileRepositoryError, GlobalSnapshotDeletion, JoinGameDecision, KeepLocalProgressError,
-    LocalArchiveEvictionError, ManifestRepositoryError, MaterializationError,
-    MaterializationOutcome, MaterializationPreview, SharedGameDeletionError,
+    DeviceProfileRepositoryError, GameJoinClassification, GlobalSnapshotDeletion, JoinGameAction,
+    JoinGameDecision, KeepLocalProgressError, LocalArchiveEvictionError, ManifestRepositoryError,
+    MaterializationError, MaterializationOutcome, MaterializationPreview, SharedGameDeletionError,
     SharedLibraryRepositoryError, SnapshotDeletionLifecycleError, SnapshotReconcilePolicy,
     SnapshotSyncCoordinator, SnapshotSyncError, V2ConflictReview,
 };
@@ -545,8 +545,7 @@ impl ServiceContext {
         game_id: &str,
         snapshot_id: &str,
     ) -> Result<(), CloudLibraryServiceError> {
-        self.require_shared_game(game_id)?;
-        let (_, profile, local_state) = cloud_bootstrap_inputs()?;
+        let (_, _, local_state) = cloud_bootstrap_inputs()?;
         if local_state.cloud_namespace_generation != CloudNamespaceGeneration::V2 {
             return Err(CloudLibraryServiceError::ActiveLibraryUnavailable);
         }
@@ -564,6 +563,36 @@ impl ServiceContext {
             .ok_or_else(|| {
                 CloudLibraryServiceError::GameProfileNotFound(snapshot_id.to_string())
             })?;
+        // Registration is part of an explicit upload, never a prerequisite UI step
+        // or an automatic synchronization policy. Conflicting definitions still
+        // require the existing review and confirmation flow.
+        if !self.is_shared_game(game_id)? {
+            let review = self.review_pending_definitions().await?;
+            let item = review
+                .items
+                .into_iter()
+                .find(|item| item.local_game_id == game_id)
+                .ok_or_else(|| CloudLibraryJoinError::DecisionRequired(game.name.clone()))?;
+            if item.classification != GameJoinClassification::LocalOnly {
+                return Err(CloudLibraryJoinError::DecisionRequired(game.name.clone()).into());
+            }
+            if let CloudLibraryJoinOutcome::ReviewChanged { game_name } = self
+                .resolve_pending_definitions(
+                    &[JoinGameDecision {
+                        local_game_id: item.local_game_id,
+                        local_fingerprint: item.local_fingerprint,
+                        cloud_fingerprint: item.cloud_fingerprint,
+                        action: JoinGameAction::AddLocal,
+                    }],
+                    false,
+                )
+                .await?
+            {
+                return Err(CloudLibraryJoinError::TargetChanged(game_name).into());
+            }
+        }
+        self.require_shared_game(game_id)?;
+        let (_, profile, local_state) = cloud_bootstrap_inputs()?;
         let local_archive_root = profile
             .local_archive_root
             .as_deref()

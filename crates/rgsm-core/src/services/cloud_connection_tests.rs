@@ -88,6 +88,70 @@ fn runtime() -> tokio::runtime::Runtime {
 }
 
 #[test]
+fn first_upload_registers_local_game_without_enabling_automatic_sync() {
+    let _lock = crate::config::lock_config_test_file();
+    runtime().block_on(async {
+        let fixture = Fixture::new().await;
+        let repository = SharedLibraryRepository::new(fixture.operator.clone(), 2);
+        let before = repository.load().await.unwrap();
+        let mut remote = before.clone();
+        remote.games.retain(|game| game.storage_key != "ready");
+        repository.compare_replace(&before, &remote).await.unwrap();
+        let root = fixture.archives.path().join("ready");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("selected.zip"), b"selected archive").unwrap();
+        std::fs::write(root.join("other.zip"), b"other archive").unwrap();
+        let mut snapshots = crate::backup::GameSnapshots::new("Ready");
+        for id in ["selected", "other"] {
+            snapshots.backups.push(
+                serde_json::from_value(serde_json::json!({
+                    "date": id, "describe": "", "path": ""
+                }))
+                .unwrap(),
+            );
+        }
+        std::fs::write(
+            root.join("Backups.json"),
+            serde_json::to_vec(&snapshots).unwrap(),
+        )
+        .unwrap();
+        fixture.service.connect_cloud_library().await.unwrap();
+        assert!(
+            fixture
+                .service
+                .upload_cloud_archive("ready", "missing")
+                .await
+                .is_err()
+        );
+        assert_eq!(repository.load().await.unwrap(), remote);
+        fixture
+            .service
+            .upload_cloud_archive("ready", "selected")
+            .await
+            .unwrap();
+        let (_, profile, state) = cloud_bootstrap_inputs().unwrap();
+        assert!(!state.is_local_game("ready"));
+        assert!(state.is_local_game("pending"));
+        assert!(!profile.games["ready"].cloud_sync_enabled);
+        let manifest = crate::cloud_sync::v2::CloudManifestRepository::new(
+            fixture.operator.clone(),
+            crate::cloud_sync::v2::CLOUD_MANIFEST_PATH,
+            3,
+        )
+        .load()
+        .await
+        .unwrap();
+        assert!(manifest.games["ready"].snapshots.contains_key("selected"));
+        assert!(!manifest.games["ready"].snapshots.contains_key("other"));
+        assert_eq!(
+            std::fs::read(root.join("other.zip")).unwrap(),
+            b"other archive"
+        );
+        fixture.assert_local_protected();
+    });
+}
+
+#[test]
 fn independent_local_game_can_be_reviewed_published_and_enabled_after_connecting() {
     let _lock = crate::config::lock_config_test_file();
     runtime().block_on(async {
