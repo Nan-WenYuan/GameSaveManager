@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.12.4",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：18e1a908db6c3602cd0f70f8861715d32f2b74da。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.12.4；完整源码见本版本 source-1.12.4.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "首次上传本地游戏时自动登记，无需先点击“启用云端备份”。支持全部游戏、单个游戏与单份备份手动上传、拉取；覆盖已有副本前仍需确认。\n\n日常操作以本地为主，不会因此开启自动同步。更新仅替换程序，保留配置与存档。\n\n基于 mcthesw/game-save-manager 的个人修改版，遵循 AGPL-3.0-only；对应源码见本版本标签及 source-1.12.4.zip。",
   "draft": false,
   "prerelease": false,
   "assets": [
