@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.14.0",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：574c8c92656928b11325ec4a8ea006de7fc9760d。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.0；完整源码见本版本 source-1.14.0.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "- 自定义顶栏随明亮、黑暗主题显示，右上角可一键切换主题。\n- 支持顶栏拖动、双击最大化/还原，以及最小化、关闭窗口。\n- 游戏列表卡片更紧凑，保留存档位置、备份数量和最近备份时间。\n\n基于 mcthesw/game-save-manager 的个人修改版，遵循 AGPL-3.0-only。对应源码提交：574c8c9。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.0；完整源码见 source-1.14.0.zip。\n\n更新仅替换程序，保留配置与存档。",
   "draft": false,
   "prerelease": false,
   "assets": [
