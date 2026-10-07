@@ -1360,6 +1360,15 @@
         "backup_actions": "Actions",
         "no_description": "No description"
     },
+    "titlebar": {
+        "light": "Switch to light mode",
+        "dark": "Switch to dark mode",
+        "minimize": "Minimize window",
+        "maximize": "Maximize window",
+        "restore": "Restore window",
+        "close": "Close window",
+        "action_failed": "Unable to control the window"
+    },
     "program_update": {
         "progress": {
             "preparing": "Preparing update…",

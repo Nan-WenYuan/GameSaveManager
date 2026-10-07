@@ -125,7 +125,10 @@ async function readBuildInfo(page: Page): Promise<{ version: string; git_hash: s
   }, '/src/api/commands.ts');
 }
 
-test('desktop recreates a destroyed window with live runtime credentials', async () => {
+test('desktop recreates a destroyed window with live runtime credentials', async ({
+  browserName,
+}, testInfo) => {
+  expect(browserName).toBe('chromium');
   const runRoot = await createRunRoot('desktop-window-lifecycle');
   const deviceId = `desktop-window-${process.pid}`;
   let failed = false;
@@ -141,7 +144,41 @@ test('desktop recreates a destroyed window with live runtime credentials', async
     let connected = await connectDesktop(primary, trayPort);
     expect((await readBuildInfo(connected.page)).version).toBeTruthy();
 
-    await closeDesktopWindow(connected.browser, primary);
+    await expect(
+      connected.page.getByRole('button', { name: 'Minimize window', exact: true })
+    ).toBeVisible();
+    if (
+      await connected.page.locator('html').evaluate((element) => element.classList.contains('dark'))
+    ) {
+      await connected.page
+        .getByRole('button', { name: 'Switch to light mode', exact: true })
+        .click();
+    }
+    await connected.page.getByRole('button', { name: 'Switch to dark mode', exact: true }).click();
+    await expect(connected.page.locator('html')).toHaveClass(/dark/);
+    await connected.page.screenshot({ path: testInfo.outputPath('custom-titlebar-dark.png') });
+    await connected.page.getByRole('button', { name: 'Switch to light mode', exact: true }).click();
+    await expect(connected.page.locator('html')).not.toHaveClass(/dark/);
+    await connected.page.getByRole('button', { name: 'Maximize window', exact: true }).click();
+    await expect(
+      connected.page.getByRole('button', { name: 'Restore window', exact: true })
+    ).toBeVisible();
+    await connected.page.getByRole('button', { name: 'Restore window', exact: true }).click();
+    await expect(
+      connected.page.getByRole('button', { name: 'Maximize window', exact: true })
+    ).toBeVisible();
+    await connected.page.locator('header > div').dblclick();
+    await expect(
+      connected.page.getByRole('button', { name: 'Restore window', exact: true })
+    ).toBeVisible();
+    await connected.page.locator('header > div').dblclick();
+    await expect(
+      connected.page.getByRole('button', { name: 'Maximize window', exact: true })
+    ).toBeVisible();
+    await connected.page.screenshot({ path: testInfo.outputPath('custom-titlebar-light.png') });
+
+    await connected.page.getByRole('button', { name: 'Close window', exact: true }).click();
+    await connected.browser.close().catch(() => undefined);
     await expect.poll(() => primary?.child.exitCode).toBeNull();
 
     second = startDesktop(trayDevice.appDataDir, deviceId, trayPort);

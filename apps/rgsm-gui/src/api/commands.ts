@@ -47,6 +47,9 @@ function unwrap<T>(result: { data?: T; error?: unknown }): CommandResult<T> {
 }
 
 export const commands = {
+  async controlMainWindow(action: types.WindowAction) {
+    return unwrap<boolean>(await sdk.controlMainWindow({ body: { action } }));
+  },
   async checkProgramUpdate() {
     return unwrap<types.CheckProgramUpdateResponses[200]>(await sdk.checkProgramUpdate());
   },

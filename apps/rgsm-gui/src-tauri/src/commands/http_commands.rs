@@ -8,6 +8,23 @@ use utoipa::{OpenApi, ToSchema};
 use crate::http::{ApiError, HttpHostState};
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub struct WindowControlRequest {
+    pub action: crate::main_window::WindowAction,
+}
+
+#[utoipa::path(post, path = "/api/v1/control-main-window", operation_id = "controlMainWindow",
+    request_body = WindowControlRequest,
+    responses((status = 200, body = bool), (status = 400, body = ApiError)))]
+pub async fn http_control_main_window(
+    State(state): State<HttpHostState>,
+    Json(request): Json<WindowControlRequest>,
+) -> Result<Json<bool>, ApiError> {
+    crate::main_window::control(state.app(), request.action)
+        .map(Json)
+        .map_err(ApiError::from_command)
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct GameManagementConfigRequest {
     pub confirmed: bool,
 }
@@ -2209,6 +2226,10 @@ pub fn router() -> Router<HttpHostState> {
             post(http_check_program_update),
         )
         .route(
+            "/api/v1/control-main-window",
+            post(http_control_main_window),
+        )
+        .route(
             "/api/v1/install-program-update",
             post(http_install_program_update),
         )
@@ -2515,6 +2536,7 @@ pub fn router() -> Router<HttpHostState> {
         http_open_url,
         http_get_build_info,
         http_check_program_update,
+        http_control_main_window,
         http_install_program_update,
         http_open_file_or_folder,
         http_get_app_log_dir,

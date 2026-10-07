@@ -3,6 +3,7 @@ import { client } from './generated/client.gen';
 type RgsmRuntimeConfig = {
   apiBaseUrl: string;
   token: string;
+  windowControls?: boolean;
 };
 
 declare global {
@@ -12,6 +13,7 @@ declare global {
 }
 
 const runtime = typeof window === 'undefined' ? undefined : window.__RGSM_RUNTIME__;
+export const hasWindowControls = runtime?.windowControls === true;
 const apiBaseUrl = runtime?.apiBaseUrl ?? '';
 let authorization = runtime ? `Bearer ${runtime.token}` : undefined;
 if (typeof window !== 'undefined') {

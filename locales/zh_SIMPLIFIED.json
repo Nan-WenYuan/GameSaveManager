@@ -1360,6 +1360,15 @@
         "backup_actions": "操作",
         "no_description": "无描述"
     },
+    "titlebar": {
+        "light": "切换到明亮模式",
+        "dark": "切换到黑暗模式",
+        "minimize": "最小化窗口",
+        "maximize": "最大化窗口",
+        "restore": "还原窗口",
+        "close": "关闭窗口",
+        "action_failed": "窗口操作失败"
+    },
     "program_update": {
         "progress": {
             "preparing": "正在准备更新…",

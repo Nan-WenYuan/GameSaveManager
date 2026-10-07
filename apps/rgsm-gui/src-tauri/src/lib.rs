@@ -98,6 +98,20 @@ pub fn run() -> anyhow::Result<()> {
     }
     let http_host_only = std::env::var_os("RGSM_HTTP_HOST_ONLY").is_some();
     let context = tauri::generate_context!();
+    // Desktop acceptance must not attach to the user's running singleton or
+    // share its window-state directory. Production identifiers stay stable.
+    #[cfg(debug_assertions)]
+    let context = {
+        let mut context = context;
+        if let Some(directory) = std::env::var_os("RGSM_E2E_APP_DATA_DIR") {
+            use std::hash::{Hash, Hasher};
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            directory.hash(&mut hash);
+            context.config_mut().identifier =
+                format!("{}.e2e{:x}", context.config().identifier, hash.finish());
+        }
+        context
+    };
     let startup_guard = startup::acquire(http_host_only, &context.config().identifier)?;
     configure_development_data_dir()?;
 

@@ -55,6 +55,9 @@ import type {
   ConnectCloudLibraryData,
   ConnectCloudLibraryErrors,
   ConnectCloudLibraryResponses,
+  ControlMainWindowData,
+  ControlMainWindowErrors,
+  ControlMainWindowResponses,
   CreateCloudLibraryData,
   CreateCloudLibraryErrors,
   CreateCloudLibraryResponses,
@@ -530,6 +533,22 @@ export const connectCloudLibrary = <ThrowOnError extends boolean = false>(
     ConnectCloudLibraryErrors,
     ThrowOnError
   >({ url: '/api/v1/connect-cloud-library', ...options });
+
+export const controlMainWindow = <ThrowOnError extends boolean = false>(
+  options: Options<ControlMainWindowData, ThrowOnError>
+): RequestResult<ControlMainWindowResponses, ControlMainWindowErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ControlMainWindowResponses,
+    ControlMainWindowErrors,
+    ThrowOnError
+  >({
+    url: '/api/v1/control-main-window',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
 export const createCloudLibrary = <ThrowOnError extends boolean = false>(
   options: Options<CreateCloudLibraryData, ThrowOnError>

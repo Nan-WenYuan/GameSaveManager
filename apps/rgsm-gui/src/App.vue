@@ -7,6 +7,7 @@ import AddGameDrawer from './components/AddGameDrawer.vue';
 import RemoteProgressPrompt from './components/RemoteProgressPrompt.vue';
 import CloudTransferProgress from './components/CloudTransferProgress.vue';
 import KFeedbackHost from './ui/kit/KFeedbackHost.vue';
+import AppTitleBar from './components/AppTitleBar.vue';
 import { events } from './api/commands';
 import {
   notifyInfo,
@@ -149,7 +150,8 @@ if (typeof window !== 'undefined') {
 </script>
 
 <template>
-  <div>
+  <div class="app-frame">
+    <AppTitleBar />
     <div class="app-shell">
       <aside class="app-aside" :style="{ width: sidebarWidth + 'px' }">
         <MainSideBar />
@@ -200,6 +202,14 @@ body {
 
 .app-shell {
   display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-frame {
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }

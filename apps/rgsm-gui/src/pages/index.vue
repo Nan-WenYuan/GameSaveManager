@@ -88,16 +88,16 @@ watch(
       <Search :size="24" class="mx-auto mb-3" aria-hidden="true" />
       {{ $t('misc.no_search_results') }}
     </p>
-    <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       <button
         v-for="game in visibleGames"
         :key="game.storage_key"
         type="button"
-        class="group flex cursor-pointer flex-col gap-4 rounded-md border border-border bg-surface p-5 text-left transition-colors hover:border-accent hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent"
+        class="group flex cursor-pointer flex-col gap-2 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors hover:border-accent hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent"
         @click="router.push(getGameManagementPath(game))"
       >
-        <div class="flex w-full items-center gap-3">
-          <Gamepad2 :size="24" class="shrink-0 text-accent" aria-hidden="true" />
+        <div class="flex w-full items-center gap-2">
+          <Gamepad2 :size="20" class="shrink-0 text-accent" aria-hidden="true" />
           <span class="min-w-0 flex-1 truncate font-medium text-text" :title="game.name">{{
             game.name
           }}</span>
@@ -109,7 +109,7 @@ watch(
           }}</KTag>
           <span>{{ $t('personal.save_locations', { count: game.save_paths.length }) }}</span>
         </div>
-        <div class="text-xs text-text-dim">
+        <div class="text-xs leading-snug text-text-dim">
           <template v-if="backupStats[game.storage_key || game.name]">
             <p>
               {{

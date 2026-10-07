@@ -1602,6 +1602,12 @@ export type VerifyArchiveIntegrityRequest = {
   expectedHash?: string | null;
 };
 
+export type WindowAction = 'inspect' | 'minimize' | 'toggle_maximize' | 'start_dragging' | 'close';
+
+export type WindowControlRequest = {
+  action: WindowAction;
+};
+
 export type U32 = number;
 
 export type AcceptV2RemoteProgressData = {
@@ -1921,6 +1927,26 @@ export type ConnectCloudLibraryResponses = {
 
 export type ConnectCloudLibraryResponse =
   ConnectCloudLibraryResponses[keyof ConnectCloudLibraryResponses];
+
+export type ControlMainWindowData = {
+  body: WindowControlRequest;
+  path?: never;
+  query?: never;
+  url: '/api/v1/control-main-window';
+};
+
+export type ControlMainWindowErrors = {
+  400: ApiError;
+};
+
+export type ControlMainWindowError = ControlMainWindowErrors[keyof ControlMainWindowErrors];
+
+export type ControlMainWindowResponses = {
+  200: boolean;
+};
+
+export type ControlMainWindowResponse =
+  ControlMainWindowResponses[keyof ControlMainWindowResponses];
 
 export type CreateCloudLibraryData = {
   body: CreateCloudLibraryRequest;

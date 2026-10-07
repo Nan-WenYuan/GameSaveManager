@@ -27,12 +27,14 @@ fn e2e_browser_args(port: Option<&str>) -> anyhow::Result<Option<String>> {
 struct RuntimeConfig<'a> {
     api_base_url: &'a str,
     token: &'a str,
+    window_controls: bool,
 }
 
 fn runtime_initialization_script(base_url: &str, token: &str) -> anyhow::Result<String> {
     let runtime = RuntimeConfig {
         api_base_url: base_url,
         token,
+        window_controls: true,
     };
     Ok(format!(
         "window.__RGSM_RUNTIME__ = {};",
@@ -56,17 +58,57 @@ pub fn create_main_window(app: &AppHandle) -> anyhow::Result<WebviewWindow> {
         .find(|window| window.label == MAIN_WINDOW_LABEL)
         .ok_or_else(|| anyhow::anyhow!("Main window configuration is not available"))?;
     let builder = WebviewWindowBuilder::from_config(app, config)?;
+    #[cfg(debug_assertions)]
+    let builder = if std::env::var_os("RGSM_E2E_APP_DATA_DIR").is_some() {
+        builder.data_directory(rgsm_core::app_dirs::get_app_data_dir().join("webview-e2e"))
+    } else {
+        builder
+    };
     #[cfg(all(debug_assertions, target_os = "windows"))]
     let builder = match e2e_browser_args(std::env::var(E2E_WEBVIEW_DEBUG_PORT).ok().as_deref())? {
         Some(arguments) => builder.additional_browser_args(&arguments),
         None => builder,
     };
     let window = builder
+        .decorations(false)
         .title(format!("游戏存档管理器-{}", app.package_info().version))
         .initialization_script(current_runtime_initialization_script(app)?)
         .build()?;
     window.restore_state(StateFlags::all())?;
     Ok(window)
+}
+
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WindowAction {
+    Inspect,
+    Minimize,
+    ToggleMaximize,
+    StartDragging,
+    Close,
+}
+
+pub fn control(app: &AppHandle, action: WindowAction) -> anyhow::Result<bool> {
+    let window = app
+        .get_webview_window(MAIN_WINDOW_LABEL)
+        .ok_or_else(|| anyhow::anyhow!("Main window is not available"))?;
+    match action {
+        WindowAction::Inspect => {}
+        WindowAction::Minimize => window.minimize()?,
+        WindowAction::ToggleMaximize => {
+            if window.is_maximized()? {
+                window.unmaximize()?;
+            } else {
+                window.maximize()?;
+            }
+        }
+        WindowAction::StartDragging => window.start_dragging()?,
+        WindowAction::Close => {
+            window.close()?;
+            return Ok(false);
+        }
+    }
+    Ok(window.is_maximized()?)
 }
 
 pub fn show_main_window(app: &AppHandle) -> anyhow::Result<()> {
