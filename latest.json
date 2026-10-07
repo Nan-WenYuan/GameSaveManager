@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.13.0",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：6a35a934fb3d1932ac694dde06887281cf1d97cb。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.13.0；完整源码见本版本 source-1.13.0.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "程序更新增加真实下载进度，显示百分比、已下载/总大小与下载速度，并区分准备、下载、校验和安装重启阶段。切换页面后仍可查看进度，失败后可以重试。\n\n本次从旧版升级仍使用旧界面；安装 1.13.0 后，后续更新显示新进度。更新仅替换程序，保留配置与存档。\n\n基于 mcthesw/game-save-manager 的个人修改版，遵循 AGPL-3.0-only；对应源码见本版本标签和 source-1.13.0.zip。",
   "draft": false,
   "prerelease": false,
   "assets": [
