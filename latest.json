@@ -1,32 +1,32 @@
 {
-  "tag_name": "v1.14.2",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：e45eca717872e864911dc66065fc7fadc1929b91。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.2；完整源码见本版本 source-1.14.2.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "tag_name": "v1.14.3",
+  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：a54ef1d17911fae8c5ec17102b84359037d3ce3b。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.3；完整源码见本版本 source-1.14.3.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
     {
-      "id": 617895381,
+      "id": 617933161,
       "name": "LICENSE",
       "size": 34523,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/LICENSE"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.3/LICENSE"
     },
     {
-      "id": 617894902,
+      "id": 617931571,
       "name": "rgsm.exe",
-      "size": 48985600,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/rgsm.exe"
+      "size": 48967680,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.3/rgsm.exe"
     },
     {
-      "id": 617895234,
+      "id": 617933145,
       "name": "SHA256SUMS",
       "size": 75,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/SHA256SUMS"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.3/SHA256SUMS"
     },
     {
-      "id": 617894788,
-      "name": "source-1.14.2.zip",
-      "size": 7596750,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/source-1.14.2.zip"
+      "id": 617931409,
+      "name": "source-1.14.3.zip",
+      "size": 7206548,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.3/source-1.14.3.zip"
     }
   ]
 }
