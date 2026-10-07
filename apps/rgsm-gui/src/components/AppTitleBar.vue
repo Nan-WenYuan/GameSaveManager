@@ -88,6 +88,13 @@ useEventListener(
 </template>
 
 <style scoped>
+header button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
 .titlebar-control {
   display: flex;
   flex-shrink: 0;

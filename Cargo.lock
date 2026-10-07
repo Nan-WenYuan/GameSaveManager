@@ -4936,7 +4936,7 @@ dependencies = [
 
 [[package]]
 name = "rgsm"
-version = "1.14.0"
+version = "1.14.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4977,14 +4977,14 @@ dependencies = [
 
 [[package]]
 name = "rgsm-cli"
-version = "1.14.0"
+version = "1.14.1"
 dependencies = [
  "rgsm-core",
 ]
 
 [[package]]
 name = "rgsm-core"
-version = "1.14.0"
+version = "1.14.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5030,14 +5030,14 @@ dependencies = [
 
 [[package]]
 name = "rgsm-ffi"
-version = "1.14.0"
+version = "1.14.1"
 dependencies = [
  "rgsm-core",
 ]
 
 [[package]]
 name = "rgsm-tui"
-version = "1.14.0"
+version = "1.14.1"
 dependencies = [
  "rgsm-core",
 ]

@@ -7,6 +7,10 @@ use crate::http::HttpHostState;
 
 const MAIN_WINDOW_LABEL: &str = "main";
 
+pub fn persisted_window_flags() -> StateFlags {
+    StateFlags::all() & !StateFlags::DECORATIONS
+}
+
 #[cfg(all(debug_assertions, target_os = "windows"))]
 const E2E_WEBVIEW_DEBUG_PORT: &str = "RGSM_E2E_WEBVIEW_DEBUG_PORT";
 
@@ -74,7 +78,7 @@ pub fn create_main_window(app: &AppHandle) -> anyhow::Result<WebviewWindow> {
         .title(format!("游戏存档管理器-{}", app.package_info().version))
         .initialization_script(current_runtime_initialization_script(app)?)
         .build()?;
-    window.restore_state(StateFlags::all())?;
+    window.restore_state(persisted_window_flags())?;
     Ok(window)
 }
 
@@ -139,6 +143,13 @@ pub fn defer_show_main_window(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_window_decorations_cannot_override_custom_titlebar() {
+        let flags = persisted_window_flags();
+        assert!(!flags.contains(StateFlags::DECORATIONS));
+        assert!(flags.contains(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED));
+    }
 
     #[test]
     fn runtime_script_round_trips_host_credentials() {

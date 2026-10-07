@@ -11,7 +11,7 @@ use rgsm_core::config::get_config;
 use tauri::Manager;
 
 use log::{error, info};
-use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+use tauri_plugin_window_state::AppHandleExt;
 
 use rgsm_core::config::config_check;
 
@@ -158,7 +158,11 @@ pub fn run() -> anyhow::Result<()> {
     }
     let mut builder = builder
         .manage(remote_progress::RemoteProgressState::new(!http_host_only))
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(main_window::persisted_window_flags())
+                .build(),
+        )
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([tauri_plugin_log::Target::new(
@@ -224,7 +228,7 @@ pub fn run() -> anyhow::Result<()> {
         if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
             if !http_host_only {
                 handle
-                    .save_window_state(StateFlags::all())
+                    .save_window_state(main_window::persisted_window_flags())
                     .expect("Cannot save window state");
             }
             // The HTTP-only host has no window by design, so its event loop

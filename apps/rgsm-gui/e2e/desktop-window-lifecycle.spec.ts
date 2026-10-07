@@ -144,6 +144,20 @@ test('desktop recreates a destroyed window with live runtime credentials', async
     let connected = await connectDesktop(primary, trayPort);
     expect((await readBuildInfo(connected.page)).version).toBeTruthy();
 
+    const nativeStyle = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class WindowStyleProbe { public struct Rect { public int Left, Top, Right, Bottom; } public struct Point { public int X, Y; } [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect r); [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref Point p); public static int TopInset(IntPtr h) { Rect r; Point p = new Point(); if (!GetWindowRect(h, out r) || !ClientToScreen(h, ref p)) return 999; return p.Y-r.Top; } }'; $taskWindow = (Get-Process -Id ${primary.child.pid}).MainWindowHandle; if ($taskWindow -eq 0) { exit 2 }; $taskInset=[WindowStyleProbe]::TopInset($taskWindow); Write-Output $taskInset; if ($taskInset -gt 16) { exit 1 }`,
+      ],
+      { encoding: 'utf8', windowsHide: true }
+    );
+    expect(nativeStyle.status, nativeStyle.stderr || nativeStyle.stdout).toBe(0);
+    const themeButton = connected.page.getByRole('button', { name: /Switch to (light|dark) mode/ });
+    await expect(themeButton).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
     await expect(
       connected.page.getByRole('button', { name: 'Minimize window', exact: true })
     ).toBeVisible();
@@ -167,11 +181,11 @@ test('desktop recreates a destroyed window with live runtime credentials', async
     await expect(
       connected.page.getByRole('button', { name: 'Maximize window', exact: true })
     ).toBeVisible();
-    await connected.page.locator('header > div').dblclick();
+    await connected.page.locator('.app-frame > header > div').dblclick();
     await expect(
       connected.page.getByRole('button', { name: 'Restore window', exact: true })
     ).toBeVisible();
-    await connected.page.locator('header > div').dblclick();
+    await connected.page.locator('.app-frame > header > div').dblclick();
     await expect(
       connected.page.getByRole('button', { name: 'Maximize window', exact: true })
     ).toBeVisible();
