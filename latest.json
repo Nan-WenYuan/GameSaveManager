@@ -1,32 +1,32 @@
 {
-  "tag_name": "v1.12.4",
-  "body": "首次上传本地游戏时自动登记，无需先点击“启用云端备份”。支持全部游戏、单个游戏与单份备份手动上传、拉取；覆盖已有副本前仍需确认。\n\n日常操作以本地为主，不会因此开启自动同步。更新仅替换程序，保留配置与存档。\n\n基于 mcthesw/game-save-manager 的个人修改版，遵循 AGPL-3.0-only；对应源码见本版本标签及 source-1.12.4.zip。",
+  "tag_name": "v1.13.0",
+  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：6a35a934fb3d1932ac694dde06887281cf1d97cb。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.13.0；完整源码见本版本 source-1.13.0.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
     {
-      "id": 610188700,
+      "id": 617755545,
       "name": "LICENSE",
       "size": 34523,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/LICENSE"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.13.0/LICENSE"
     },
     {
-      "id": 610186640,
+      "id": 617755240,
       "name": "rgsm.exe",
-      "size": 48727552,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/rgsm.exe"
+      "size": 48586240,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.13.0/rgsm.exe"
     },
     {
-      "id": 610188687,
+      "id": 617755528,
       "name": "SHA256SUMS",
       "size": 75,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/SHA256SUMS"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.13.0/SHA256SUMS"
     },
     {
-      "id": 610186267,
-      "name": "source-1.12.4.zip",
-      "size": 7589934,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.12.4/source-1.12.4.zip"
+      "id": 617755160,
+      "name": "source-1.13.0.zip",
+      "size": 7592943,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.13.0/source-1.13.0.zip"
     }
   ]
 }
