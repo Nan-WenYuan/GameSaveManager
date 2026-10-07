@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useDark, useDebounceFn, useEventListener } from '@vueuse/core';
-import { Gamepad2, Moon, Sun, Minus, Square, Copy, X } from '@lucide/vue';
+import { Moon, Sun, Minus, Square, Copy, X } from '@lucide/vue';
+import appIcon from '../../src-tauri/icons/32x32.png';
 import { commands } from '../api/commands';
 import { hasWindowControls } from '../api/client';
 import type { WindowAction } from '../api/generated/types.gen';
@@ -40,7 +41,7 @@ useEventListener(
       @mousedown="drag"
       @dblclick="control('toggle_maximize')"
     >
-      <Gamepad2 :size="16" class="shrink-0 text-accent" aria-hidden="true" />
+      <img :src="appIcon" class="h-4 w-4 shrink-0" alt="" draggable="false" />
       <span class="truncate text-xs font-medium">{{ $t('app.product_name') }}</span>
       <span v-if="programVersion" class="text-xs text-text-dim">{{ programVersion }}</span>
     </div>
