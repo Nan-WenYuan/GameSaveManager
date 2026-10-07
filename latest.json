@@ -1,6 +1,6 @@
 {
   "tag_name": "v1.14.1",
-  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：cd45c5f339bf1db75fa93ed76d9928076541aead。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.1；完整源码见本版本 source-1.14.1.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
+  "body": "- 修复升级后旧窗口状态重新显示系统标题栏的问题，只保留自定义顶栏。\n- 修复顶栏按钮默认灰色背景，按钮与明暗主题保持一致。\n\n基于 mcthesw/game-save-manager 的个人修改版，遵循 AGPL-3.0-only。对应源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.1；完整源码见 source-1.14.1.zip。\n\n更新仅替换程序，保留配置与存档。",
   "draft": false,
   "prerelease": false,
   "assets": [
