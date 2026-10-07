@@ -1,32 +1,32 @@
 {
-  "tag_name": "v1.14.1",
-  "body": "- 修复升级后旧窗口状态重新显示系统标题栏的问题，只保留自定义顶栏。\n- 修复顶栏按钮默认灰色背景，按钮与明暗主题保持一致。\n\n基于 mcthesw/game-save-manager 的个人修改版，遵循 AGPL-3.0-only。对应源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.1；完整源码见 source-1.14.1.zip。\n\n更新仅替换程序，保留配置与存档。",
+  "tag_name": "v1.14.2",
+  "body": "基于 mcthesw/game-save-manager 的个人自用修改版，遵循 AGPL-3.0-only。\n\n对应源码提交：e45eca717872e864911dc66065fc7fadc1929b91。在线源码：https://github.com/Nan-WenYuan/GameSaveManager/tree/v1.14.2；完整源码见本版本 source-1.14.2.zip 附件。\n\n更新仅替换程序，保留配置与存档。修改说明见对应版本 README。",
   "draft": false,
   "prerelease": false,
   "assets": [
     {
-      "id": 617859605,
+      "id": 617895381,
       "name": "LICENSE",
       "size": 34523,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.1/LICENSE"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/LICENSE"
     },
     {
-      "id": 617859285,
+      "id": 617894902,
       "name": "rgsm.exe",
-      "size": 48986112,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.1/rgsm.exe"
+      "size": 48985600,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/rgsm.exe"
     },
     {
-      "id": 617859575,
+      "id": 617895234,
       "name": "SHA256SUMS",
       "size": 75,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.1/SHA256SUMS"
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/SHA256SUMS"
     },
     {
-      "id": 617859190,
-      "name": "source-1.14.1.zip",
-      "size": 7596748,
-      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.1/source-1.14.1.zip"
+      "id": 617894788,
+      "name": "source-1.14.2.zip",
+      "size": 7596750,
+      "browser_download_url": "https://github.com/Nan-WenYuan/GameSaveManager/releases/download/v1.14.2/source-1.14.2.zip"
     }
   ]
 }
