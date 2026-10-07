@@ -1361,6 +1361,14 @@
         "no_description": "无描述"
     },
     "program_update": {
+        "progress": {
+            "preparing": "正在准备更新…",
+            "downloading": "正在下载更新…",
+            "verifying": "下载完成，正在校验文件…",
+            "installing": "正在准备安装并重启…",
+            "failed": "更新失败，可以重试；当前程序保持不变。",
+            "speed": "{speed}/秒"
+        },
         "title": "程序更新",
         "hint": "从公开发布仓库检查更新，无需令牌。只替换程序，保留配置和备份。",
         "check": "检查更新",

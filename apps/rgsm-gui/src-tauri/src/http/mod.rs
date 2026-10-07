@@ -105,7 +105,10 @@ impl HostEventHub {
 }
 
 fn is_stateful_event(event_type: &str) -> bool {
-    matches!(event_type, "cloud-sync-status" | "remote-progress-pending")
+    matches!(
+        event_type,
+        "cloud-sync-status" | "remote-progress-pending" | "program-update-progress"
+    )
 }
 
 pub fn emit<T: Serialize>(app: &AppHandle, event_type: &str, payload: &T) {

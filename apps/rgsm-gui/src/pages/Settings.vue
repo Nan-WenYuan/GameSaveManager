@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 // TODO:调整日志设置，比如删除日
-import { computed, nextTick, ref, watch, onMounted } from 'vue';
+import { computed, nextTick, ref, watch, onMounted, onUnmounted } from 'vue';
+import { events } from '../api/events';
+import type { ProgramUpdateProgress } from '../api/generated/types.gen';
 import { $t, getSupportedLanguages, i18n } from '../i18n';
 import draggable from 'vuedraggable';
 import {
@@ -108,6 +110,29 @@ const gameListOptions = computed(() => [
 ]);
 const feedback = useFeedback();
 const programUpdateBusy = ref(false);
+const programUpdateProgress = ref<ProgramUpdateProgress | null>(null);
+const programUpdatePercent = computed(() => {
+  const progress = programUpdateProgress.value;
+  if (!progress?.totalBytes) return undefined;
+  return Math.min(100, Math.floor((progress.downloadedBytes / progress.totalBytes) * 100));
+});
+function updateSize(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
+}
+let stopUpdateProgress: (() => void) | undefined;
+let settingsDisposed = false;
+onMounted(async () => {
+  const stop = await events.programUpdateProgress.listen(({ payload }) => {
+    programUpdateProgress.value = payload;
+    programUpdateBusy.value = payload.stage !== 'failed';
+  });
+  if (settingsDisposed) stop();
+  else stopUpdateProgress = stop;
+});
+onUnmounted(() => {
+  settingsDisposed = true;
+  stopUpdateProgress?.();
+});
 const programUpdate = ref<{
   currentVersion: string;
   latestVersion: string;
@@ -144,15 +169,23 @@ async function installProgramUpdate() {
     return;
   }
   programUpdateBusy.value = true;
+  programUpdateProgress.value = {
+    stage: 'preparing',
+    downloadedBytes: 0,
+    totalBytes: 0,
+    bytesPerSecond: 0,
+  };
   try {
     const result = await commands.installProgramUpdate();
     if (result.status === 'error') {
+      programUpdateProgress.value = { ...programUpdateProgress.value!, stage: 'failed' };
       notifyError(result.error);
       programUpdateBusy.value = false;
       return;
     }
     notifySuccess($t('program_update.restarting'));
   } catch (reason) {
+    programUpdateProgress.value = { ...programUpdateProgress.value!, stage: 'failed' };
     notifyError(String(reason));
     programUpdateBusy.value = false;
   }
@@ -1118,6 +1151,27 @@ const { linksWithGames: router_list } = useNavigationLinks();
                 >
                   {{ $t('program_update.install') }}
                 </KButton>
+              </div>
+              <div v-if="programUpdateProgress" class="mt-3" aria-live="polite">
+                <p>{{ $t(`program_update.progress.${programUpdateProgress.stage}`) }}</p>
+                <template v-if="programUpdateProgress.stage === 'downloading'">
+                  <progress
+                    class="mt-2 h-2 w-full accent-accent"
+                    :value="programUpdatePercent"
+                    max="100"
+                    :aria-label="$t('program_update.progress.downloading')"
+                  />
+                  <p class="mt-1 text-sm">
+                    {{ programUpdatePercent }}% ·
+                    {{ updateSize(programUpdateProgress.downloadedBytes) }} /
+                    {{ updateSize(programUpdateProgress.totalBytes) }} ·
+                    {{
+                      $t('program_update.progress.speed', {
+                        speed: updateSize(programUpdateProgress.bytesPerSecond),
+                      })
+                    }}
+                  </p>
+                </template>
               </div>
               <template v-if="programUpdate">
                 <p class="mt-3">

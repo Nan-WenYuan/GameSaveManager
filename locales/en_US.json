@@ -1361,6 +1361,14 @@
         "no_description": "No description"
     },
     "program_update": {
+        "progress": {
+            "preparing": "Preparing update…",
+            "downloading": "Downloading update…",
+            "verifying": "Download complete. Verifying integrity…",
+            "installing": "Preparing installation and restart…",
+            "failed": "Update failed. You can retry; the current program is unchanged.",
+            "speed": "{speed}/s"
+        },
         "title": "Program updates",
         "hint": "Check the public release repository without a token. Configuration and backups are preserved.",
         "check": "Check for updates",

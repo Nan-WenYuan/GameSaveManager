@@ -1035,6 +1035,20 @@ export type ProgramUpdateInfo = {
   releaseUrl: string;
 };
 
+export type ProgramUpdateProgress = {
+  bytesPerSecond: number;
+  downloadedBytes: number;
+  stage: ProgramUpdateStage;
+  totalBytes: number;
+};
+
+export type ProgramUpdateStage =
+  | 'preparing'
+  | 'downloading'
+  | 'verifying'
+  | 'installing'
+  | 'failed';
+
 export type ProgressNotice = {
   game_id: string;
   game_name: string;

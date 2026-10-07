@@ -79,9 +79,11 @@ pub async fn http_check_program_update()
 pub async fn http_install_program_update(
     State(state): State<HttpHostState>,
 ) -> Result<Json<()>, ApiError> {
-    crate::program_update::prepare()
-        .await
-        .map_err(ApiError::from_command)?;
+    crate::program_update::prepare(|progress| {
+        crate::http::emit(state.app(), "program-update-progress", &progress);
+    })
+    .await
+    .map_err(ApiError::from_command)?;
     let app = state.app().clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -2626,6 +2628,7 @@ pub fn router() -> Router<HttpHostState> {
         HttpHostInfo,
         RegenerateHttpApiTokenResponse,
         crate::http::HostEvent,
+        crate::program_update::ProgramUpdateProgress,
         crate::commands::HostNotification,
         crate::commands::CloudSyncStatusEvent,
         crate::commands::CloudSyncErrorEvent,

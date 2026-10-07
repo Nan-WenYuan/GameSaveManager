@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result, bail, ensure};
@@ -22,6 +22,49 @@ const ASSET_NAME: &str = "rgsm.exe";
 const UPDATE_DIR: &str = ".rgsm-update";
 const MAX_EXECUTABLE_SIZE: u64 = 256 * 1024 * 1024;
 static PREPARING: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProgramUpdateStage {
+    Preparing,
+    Downloading,
+    Verifying,
+    Installing,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgramUpdateProgress {
+    pub stage: ProgramUpdateStage,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub bytes_per_second: u64,
+}
+
+impl ProgramUpdateProgress {
+    fn phase(stage: ProgramUpdateStage) -> Self {
+        Self {
+            stage,
+            downloaded_bytes: 0,
+            total_bytes: 0,
+            bytes_per_second: 0,
+        }
+    }
+
+    fn downloading(downloaded: u64, total: u64, elapsed: Duration) -> Self {
+        Self {
+            stage: ProgramUpdateStage::Downloading,
+            downloaded_bytes: downloaded.min(total),
+            total_bytes: total,
+            bytes_per_second: if elapsed.is_zero() {
+                0
+            } else {
+                (downloaded as f64 / elapsed.as_secs_f64()) as u64
+            },
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -181,28 +224,66 @@ fn validate_asset_url(value: &str) -> Result<()> {
 }
 
 async fn download(client: &reqwest::Client, asset: &Asset, limit: u64) -> Result<Vec<u8>> {
+    download_with_progress(client, asset, limit, &|_| {}).await
+}
+
+async fn download_with_progress(
+    client: &reqwest::Client,
+    asset: &Asset,
+    limit: u64,
+    report: &(impl Fn(ProgramUpdateProgress) + Sync),
+) -> Result<Vec<u8>> {
     ensure!(
         asset.size > 0 && asset.size <= limit,
         rust_i18n::t!("program_update.errors.size_invalid").to_string()
     );
     validate_asset_url(&asset.browser_download_url)?;
-    let mut response = client
+    let response = client
         .get(&asset.browser_download_url)
         .send()
         .await?
         .error_for_status()?;
+    read_download_response(response, asset.size, limit, report).await
+}
+
+async fn read_download_response(
+    mut response: reqwest::Response,
+    expected_size: u64,
+    limit: u64,
+    report: &(impl Fn(ProgramUpdateProgress) + Sync),
+) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
+    let started = Instant::now();
+    let mut last_report = started;
+    report(ProgramUpdateProgress::downloading(
+        0,
+        expected_size,
+        Duration::ZERO,
+    ));
     while let Some(chunk) = response.chunk().await? {
         ensure!(
             (bytes.len() as u64) + (chunk.len() as u64) <= limit,
             rust_i18n::t!("program_update.errors.size_exceeded").to_string()
         );
         bytes.extend_from_slice(&chunk);
+        if last_report.elapsed() >= Duration::from_millis(250) {
+            report(ProgramUpdateProgress::downloading(
+                bytes.len() as u64,
+                expected_size,
+                started.elapsed(),
+            ));
+            last_report = Instant::now();
+        }
     }
     ensure!(
-        bytes.len() as u64 == asset.size,
+        bytes.len() as u64 == expected_size,
         rust_i18n::t!("program_update.errors.incomplete").to_string()
     );
+    report(ProgramUpdateProgress::downloading(
+        bytes.len() as u64,
+        expected_size,
+        started.elapsed(),
+    ));
     Ok(bytes)
 }
 
@@ -241,7 +322,7 @@ struct Handoff {
 }
 
 /// Launches an independent copy of this executable before the caller exits.
-pub async fn prepare() -> Result<()> {
+pub async fn prepare(report: impl Fn(ProgramUpdateProgress) + Sync) -> Result<()> {
     ensure!(
         cfg!(windows),
         rust_i18n::t!("program_update.errors.windows_only").to_string()
@@ -254,14 +335,16 @@ pub async fn prepare() -> Result<()> {
         !PREPARING.swap(true, Ordering::SeqCst),
         rust_i18n::t!("program_update.errors.preparing").to_string()
     );
-    let result = prepare_inner().await;
+    report(ProgramUpdateProgress::phase(ProgramUpdateStage::Preparing));
+    let result = prepare_inner(&report).await;
     if result.is_err() {
+        report(ProgramUpdateProgress::phase(ProgramUpdateStage::Failed));
         PREPARING.store(false, Ordering::SeqCst);
     }
     result
 }
 
-async fn prepare_inner() -> Result<()> {
+async fn prepare_inner(report: &(impl Fn(ProgramUpdateProgress) + Sync)) -> Result<()> {
     let executable = std::env::current_exe()?.canonicalize()?;
     ensure!(
         executable
@@ -296,8 +379,10 @@ async fn prepare_inner() -> Result<()> {
     let hash = checksum_for_executable(std::str::from_utf8(
         &download(&client, sums, 16 * 1024).await?,
     )?)?;
-    let bytes = download(&client, binary, MAX_EXECUTABLE_SIZE).await?;
+    let bytes = download_with_progress(&client, binary, MAX_EXECUTABLE_SIZE, report).await?;
+    report(ProgramUpdateProgress::phase(ProgramUpdateStage::Verifying));
     verify(&bytes, &hash)?;
+    report(ProgramUpdateProgress::phase(ProgramUpdateStage::Installing));
     fs::create_dir(&directory)?;
     let staged = (|| -> Result<()> {
         fs::write(directory.join("new.exe"), bytes)?;
@@ -492,6 +577,44 @@ pub fn clean_completed_update() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn streamed_download_reports_real_bytes_and_rejects_incomplete_files() {
+        for (expected_size, limit, succeeds) in [(4, 4, true), (8, 8, false), (4, 3, false)] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = std::thread::spawn(move || {
+                use std::io::Read;
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 4096];
+                assert!(stream.read(&mut request).unwrap() > 0);
+                stream
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n")
+                    .unwrap();
+                stream.write_all(b"MZ").unwrap();
+                std::thread::sleep(Duration::from_millis(300));
+                stream.write_all(b"ok").unwrap();
+            });
+            let response = reqwest::get(format!("http://{address}")).await.unwrap();
+            let progress = std::sync::Mutex::new(Vec::new());
+            let bytes = read_download_response(response, expected_size, limit, &|event| {
+                progress.lock().unwrap().push(event);
+            })
+            .await;
+            server.join().unwrap();
+            let events = progress.into_inner().unwrap();
+            assert_eq!(events[0].downloaded_bytes, 0);
+            assert_eq!(events[0].total_bytes, expected_size);
+            assert_eq!(bytes.is_ok(), succeeds);
+            if succeeds {
+                assert_eq!(bytes.unwrap(), b"MZok");
+                assert_eq!(events.last().unwrap().downloaded_bytes, expected_size);
+                assert!(events.last().unwrap().bytes_per_second > 0);
+            } else {
+                assert!(events.last().unwrap().downloaded_bytes < expected_size);
+            }
+        }
+    }
 
     #[test]
     fn public_update_requests_never_include_save_authorization() {

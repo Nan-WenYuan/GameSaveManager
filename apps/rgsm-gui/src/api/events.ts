@@ -8,6 +8,7 @@ import type {
   HostNotification,
   QuickActionCompleted,
   PendingProgress,
+  ProgramUpdateProgress,
 } from './generated/types.gen';
 
 export type { CloudSyncErrorEvent, CloudSyncStatusEvent, HostNotification, QuickActionCompleted };
@@ -18,11 +19,12 @@ type HostEventMap = {
   notification: HostNotification;
   'quick-action-completed': QuickActionCompleted;
   'remote-progress-pending': PendingProgress;
+  'program-update-progress': ProgramUpdateProgress;
 };
 
 type Listener<T> = (event: { payload: T }) => void;
 const dispatcher = createEventDispatcher<HostEvent>(
-  new Set(['cloud-sync-status', 'remote-progress-pending'])
+  new Set(['cloud-sync-status', 'remote-progress-pending', 'program-update-progress'])
 );
 let connection: AbortController | undefined;
 
@@ -59,6 +61,10 @@ function listen<K extends keyof HostEventMap>(eventType: K, listener: Listener<H
 }
 
 export const events = {
+  programUpdateProgress: {
+    listen: (listener: Listener<ProgramUpdateProgress>) =>
+      listen('program-update-progress', listener),
+  },
   remoteProgressPending: {
     listen: (listener: Listener<PendingProgress>) => listen('remote-progress-pending', listener),
   },

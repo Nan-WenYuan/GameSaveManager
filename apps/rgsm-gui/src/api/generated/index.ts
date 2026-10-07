@@ -571,6 +571,8 @@ export type {
   PreviewSaveUnitResolutionResponse,
   PreviewSaveUnitResolutionResponses,
   ProgramUpdateInfo,
+  ProgramUpdateProgress,
+  ProgramUpdateStage,
   ProgressNotice,
   ProgressRelation,
   PullGameManagementConfigData,
